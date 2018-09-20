@@ -93,7 +93,7 @@ Now your project have 3 files:
         
 Clone this project to project directory:
 
-    git clone https://github.com/hgoldfish/laf_rpc
+    git clone --recursive https://github.com/hgoldfish/laf_rpc
     
 Then you have 3 files and a subdirectory:
 
