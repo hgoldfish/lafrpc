@@ -13,7 +13,7 @@ Here comes an hello world example:
 The server source:
 
     // server.cpp
-    #include "laf_rpc/laf_rpc.h"
+    #include "laf_rpc/cpp/laf_rpc.h"
 
     using namespace laf_rpc;
 
@@ -42,7 +42,7 @@ The server source:
 The client source:
 
     // client.cpp
-    #include "laf_rpc/laf_rpc.h"
+    #include "laf_rpc/cpp/laf_rpc.h"
 
     using namespace laf_rpc;
 
