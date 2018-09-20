@@ -27,10 +27,6 @@ The server source:
     int main(int argc, char **argv)
     {
         QSharedPointer<Rpc> rpc = Rpc::use("server", "msgpack");
-        if(rpc.isNull()) {
-            qDebug() << "can not create rpc server.";
-            return 1;
-        }
         QSharedPointer<Hello> hello(new Hello());
         rpc->registerInstance(hello, "demo");
         rpc->startServer("tcp://127.0.0.1:8002");
@@ -49,10 +45,6 @@ The client source:
     int main(int argc, char **argv)
     {
         QSharedPointer<Rpc> rpc = Rpc::use("client", "msgpack");
-        if(rpc.isNull()) {
-            qDebug() << "can not create rpc server.";
-            return 1;
-        }
         QSharedPointer<Peer> peer = rpc->connect("tcp://127.0.0.1:8002");
         if (peer.isNull()) {
             qDebug() << "can not connect to peer.";
