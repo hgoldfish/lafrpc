@@ -1,0 +1,6 @@
+[submodule "cpp/qtnetworkng"]
+	path = cpp/qtnetworkng
+	url = https://github.com/hgoldfish/qtnetworkng
+[submodule "cpp/qmsgpack"]
+	path = cpp/qmsgpack
+	url = https://github.com/hgoldfish/qmsgpack
