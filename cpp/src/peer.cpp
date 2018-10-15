@@ -102,7 +102,6 @@ public:
     QVariant call(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs);
     void handlePacket();
     void handleRequest(QSharedPointer<Request> request);
-    void handleResponse(QSharedPointer<Response> response);
     QVariant lookupAndCall(const QString &methodName, const QVariantList &args,
                            const QVariantMap &kwargs, const QVariantMap &header);
 
@@ -178,7 +177,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     bool success;
 
     if(broken || rpc.isNull()) {
-        throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
+        throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
     }
 
     QSharedPointer<UseStream> streamFromClient;
@@ -213,41 +212,45 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     if(!rpc->d_ptr->headerCallback.isNull()) {
         request.header = rpc->d_ptr->headerCallback->make(q, methodName);
         if(broken || rpc.isNull()) {
-            throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
+            throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
         }
     }
 
-    QSharedPointer<qtng::VirtualChannel> subChannelFromClient;
     if (!streamFromClient.isNull()) {
-        subChannelFromClient = channel->makeChannel();
-        request.channel = subChannelFromClient->channelNumber();
-        if(broken || rpc.isNull()) {
-            throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
+        QSharedPointer<qtng::VirtualChannel> subChannelFromClient = channel->makeChannel();
+        if (subChannelFromClient.isNull()) {
+            throw RpcDisconnectedException(QStringLiteral("can not make sub channel."));
         }
+        if(broken || rpc.isNull()) {
+            throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+        }
+        QByteArray connectionId;
+        QSharedPointer<qtng::SocketLike> rawSocket;
         if (streamFromClient->preferRawSocket) {
-            QByteArray connectionId;
-            QSharedPointer<qtng::SocketLike> connection = rpc->makeRawSocket(name, &connectionId);
-            if (!connection.isNull() && !connectionId.isEmpty()) {
-                request.rawSocket = connectionId;
-                streamFromClient->rawSocket = connection;
+            rawSocket = rpc->makeRawSocket(name, &connectionId);
+            if (rawSocket.isNull() || connectionId.isEmpty()) {
+                qDebug() << "can not make raw socket to" << name;
             }
             if(broken || rpc.isNull()) {
-                throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
+                throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
             }
         }
+        streamFromClient->init(rpc, UseStream::ClientSide | UseStream::ParamInRequest, subChannelFromClient, rawSocket);
+        request.channel = subChannelFromClient->channelNumber();
+        request.rawSocket = connectionId;
     }
 
     QByteArray requestBytes = packRequest(rpc.data()->serialization(), request);
     if(requestBytes.isEmpty()) {
-        throw RpcSerializationException(QString::fromUtf8("can not serialize request while calling remote method: %1").arg(methodName));
+        throw RpcSerializationException(QStringLiteral("can not serialize request while calling remote method: %1").arg(methodName));
     }
     if(!key.isEmpty()) {
         requestBytes = rpc->crypto()->encrypt(requestBytes, key);
         if(requestBytes.isEmpty()) {
-            throw RpcInternalException(QString::fromUtf8("can not encrypt data while calling remote method: %1").arg(methodName));
+            throw RpcInternalException(QStringLiteral("can not encrypt data while calling remote method: %1").arg(methodName));
         }
         if(broken || rpc.isNull()) {
-            throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
+            throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
         }
     }
 
@@ -261,7 +264,11 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     }
 
     if(broken || rpc.isNull()) {
-        throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
+        throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+    }
+
+    if (!streamFromClient.isNull()) {
+        streamFromClient->setReady();
     }
 
     QSharedPointer<Response> response;
@@ -271,7 +278,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         waiters.remove(request.id);
     } catch (qtng::TimeoutException &) {
         waiters.remove(request.id);
-        const QString &message = QString::fromUtf8("timeout calling remote method: `%1`").arg(methodName);
+        const QString &message = QStringLiteral("timeout calling remote method: `%1`").arg(methodName);
         throw RpcRemoteException(message);
     } catch (qtng::CoroutineExitException &) {
         waiters.remove(request.id);
@@ -280,17 +287,17 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         throw;
     } catch (...) {
         waiters.remove(request.id);
-        const QString &message = QString::fromUtf8("unknown error occurs while waiting response of remote method: `%1`").arg(methodName);
+        const QString &message = QStringLiteral("unknown error occurs while waiting response of remote method: `%1`").arg(methodName);
         throw RpcInternalException(message);
     }
 
     if(response.isNull() || !response->isOk()) {
-        const QString &message = QString::fromUtf8("got empty response while waiting response of remote method: `%1`").arg(methodName);
+        const QString &message = QStringLiteral("got empty response while waiting response of remote method: `%1`").arg(methodName);
         throw RpcDisconnectedException(message);
     }
 
     if(broken || rpc.isNull()) {
-        throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
+        throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
     }
 
     if(!response->exception.isNull()) {
@@ -298,13 +305,9 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         // the upper function do not return if success.
         throw RpcInternalException("unknown exception.");
     }
-    if (!streamFromClient.isNull()) {
-        streamFromClient->setReady(UseStream::ClientSide | UseStream::ParamInRequest, subChannelFromClient);
-    }
 
     QSharedPointer<UseStream> streamFromServer = UseStream::convert(response->result);
     if (!streamFromServer.isNull()) {
-        streamFromServer->setRpc(rpc);
         if (response->channel == 0) {
             qWarning() << "the response of" << methodName << "is a use-stream, but has no channel number.";
             throw RpcInternalException();
@@ -314,17 +317,18 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
             qWarning() << methodName << "returns a channel, but is gone.";
             throw RpcRemoteException();
         }
+        QSharedPointer<qtng::SocketLike> rawSocket;
         if (!response->rawSocket.isEmpty()) {
             if (!streamFromServer->preferRawSocket) {
                 qWarning() << "the response of" << methodName << "do not prefer raw socket, but got one.";
             }
-            QSharedPointer<qtng::SocketLike> connection = rpc->getRawSocket(name, response->rawSocket);
-            if (connection.isNull()) {
+            rawSocket = rpc->getRawSocket(name, response->rawSocket);
+            if (rawSocket.isNull()) {
                 qWarning() << "the response of" << methodName << "returns a raw socket, but is gone:" << response->rawSocket;
             }
-            streamFromServer->rawSocket = connection;
         }
-        streamFromServer->setReady(UseStream::ClientSide | UseStream::ValueOfResponse, subChannelFromServer);
+        streamFromServer->init(rpc, UseStream::ClientSide | UseStream::ValueOfResponse, subChannelFromServer, rawSocket);
+        streamFromServer->setReady();
     }
     return response->result;
 }
@@ -360,7 +364,7 @@ void PeerPrivate::handlePacket()
                 return shutdown();
             }
         }
-        
+
         QSharedPointer<Request> request(new Request());
         QSharedPointer<Response> response(new Response());
         int what = unpackRequestOrResponse(rpc->serialization(), packet, request.data(), response.data());
@@ -418,35 +422,37 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
     Response response;
     response.id = request->id;
 
-    QSharedPointer<qtng::VirtualChannel> subChannelFromClient;
     if (!streamFromClient.isNull()) {
         if (request->channel == 0) {
             qWarning() << "the request of" << request->methodName << "pass a use-stream parameter, but sent no channel.";
             QSharedPointer<RpcRemoteException> e(new RpcRemoteException("bad channel"));
             response.exception.setValue(e);
         } else {
-            subChannelFromClient = channel->getChannel(request->channel);
+            QSharedPointer<qtng::VirtualChannel> subChannelFromClient = channel->getChannel(request->channel);
             if (subChannelFromClient.isNull()) {
                 qWarning() << "the request of" << request->methodName << "sent a channel, but it is gone.";
                 QSharedPointer<RpcRemoteException> e(new RpcRemoteException("bad channel"));
                 response.exception.setValue(e);
             } else {
+                QSharedPointer<qtng::SocketLike> rawSocket;
                 if (!request->rawSocket.isEmpty()) {
                     if (!streamFromClient->preferRawSocket) {
-                        qWarning() << request->methodName << "send an UseSteam(prefer_raw_socket), but there is no raw socket.";
+                        qWarning() << request->methodName << "send an raw socket, but UseSteam do not prefer raw socket.";
                     }
-                    QSharedPointer<qtng::SocketLike> connection =  rpc->getRawSocket(name, request->rawSocket);
-                    if (connection.isNull()) {
+                    rawSocket =  rpc->getRawSocket(name, request->rawSocket);
+                    if (rawSocket.isNull()) {
                         qWarning() << request->methodName << "sent an use-stream raw socket, but it is gone.";
-                    } else {
-                        streamFromClient->rawSocket = connection;
                     }
                 }
+                streamFromClient->init(rpc, UseStream::ServerSide | UseStream::ParamInRequest, subChannelFromClient, rawSocket);
             }
         }
     }
 
     if (response.exception.isNull()) {
+        if (!streamFromClient.isNull()) {
+            streamFromClient->setReady();
+        }
         try {
             response.result = lookupAndCall(request->methodName, request->args, request->kwargs, request->header);
         } catch (qtng::CoroutineException) {
@@ -463,38 +469,40 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
         }
     }
 
-    QSharedPointer<qtng::VirtualChannel> subChannelFromServer;
+
     QSharedPointer<UseStream> streamFromServer;
     if (response.exception.isNull()) {
         streamFromServer = UseStream::convert(response.result);
         if (!streamFromServer.isNull()) {
-            streamFromServer->setRpc(rpc);
-            subChannelFromServer = channel->makeChannel();
+            QSharedPointer<qtng::VirtualChannel> subChannelFromServer = channel->makeChannel();
             if (broken || rpc.isNull()) {
                 return;
             }
             if (subChannelFromServer.isNull()) {
                 qWarning() << "can not make channel for the respone of" << request->methodName;
-                response.result.clear();
                 QSharedPointer<RpcRemoteException> e(new RpcRemoteException("bad channel"));
                 response.exception.setValue(e);
             } else {
-                response.channel = subChannelFromServer->channelNumber();
+                QSharedPointer<qtng::SocketLike> rawSocket;
+                QByteArray connectionId;
                 if (streamFromServer->preferRawSocket) {
-                    QByteArray connectionId;
-                    QSharedPointer<qtng::SocketLike> connection = rpc->makeRawSocket(name, &connectionId);
-                    if (connection.isNull() || connectionId.isEmpty()) {
+                    rawSocket = rpc->makeRawSocket(name, &connectionId);
+                    if (rawSocket.isNull() || connectionId.isEmpty()) {
                         qDebug() << "can not make raw sockt to" << name << "for" << request->methodName;
-                    } else {
-                        streamFromServer->rawSocket = connection;
-                        response.rawSocket = connectionId;
                     }
                     if (broken || rpc.isNull()) {
                         return;
                     }
                 }
+                streamFromServer->init(rpc, UseStream::ServerSide | UseStream::ValueOfResponse, subChannelFromServer, rawSocket);
+                response.channel = subChannelFromServer->channelNumber();
+                response.rawSocket = connectionId;
             }
         }
+    }
+
+    if (!response.exception.isNull()) {
+        response.result.clear();
     }
 
     const QByteArray &responseBytes = packResponse(rpc.data()->serialization(), response);
@@ -512,11 +520,8 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
         return;
     }
 
-    if (!streamFromClient.isNull()) {
-        streamFromClient->setReady(UseStream::ServerSide | UseStream::ParamInRequest, subChannelFromClient);
-    }
     if (!streamFromServer.isNull()) {
-        streamFromServer->setReady(UseStream::ServerSide | UseStream::ValueOfResponse, subChannelFromServer);
+        streamFromServer->setReady();
     }
 }
 

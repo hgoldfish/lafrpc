@@ -1,11 +1,11 @@
 #ifndef LAFRPC_SERIALIZATION_H
 #define LAFRPC_SERIALIZATION_H
 
-#include <QtCore/QCryptographicHash>
-#include <QtCore/QVariant>
-#include <QtCore/QMap>
-#include <QtCore/QSharedPointer>
-#include <QtCore/QMetaType>
+#include <QtCore/qcryptographichash.h>
+#include <QtCore/qvariant.h>
+#include <QtCore/qmap.h>
+#include <QtCore/qsharedpointer.h>
+#include <QtCore/qmetatype.h>
 #include <typeinfo>
 #include <type_traits>
 #include "../include/base.h"
@@ -158,8 +158,6 @@ public:
 
 class MessagePackSerialization: public Serialization
 {
-public:
-    MessagePackSerialization();
 public:
     virtual QByteArray pack(const QVariant &obj) override;
     virtual QVariant unpack(const QByteArray &data) override;

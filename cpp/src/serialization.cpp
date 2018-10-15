@@ -5,7 +5,6 @@
 #include <QtCore/QDataStream>
 #include <QtCore/QtEndian>
 #include "../include/serialization.h"
-#include "../qmsgpack/src/msgpack.h"
 
 BEGIN_LAFRPC_NAMESPACE
 
@@ -218,68 +217,28 @@ QVariant DataStreamSerialization::unpack(const QByteArray &data)
 }
 
 
-static QByteArray pack_datetime(const QVariant &v)
-{
-    const QDateTime &dt = v.value<QDateTime>();
-    if(!dt.isValid()) {
-        return QByteArray(8, (char)0);
-    }
-    quint64 msecs = dt.toMSecsSinceEpoch();
-    quint64 t = ((msecs % 1000) * 1000) << 34 | (msecs / 1000);
-    QByteArray bs;
-    bs.resize(8);
-#if QT_VERSION_CHECK(5, 7, 0)
-    qToBigEndian(t, static_cast<void*>(bs.data()));
-#else
-    qToBigEndian(t, static_cast<uchar*>(bs.data()));
-#endif
-    return bs;
-}
-
-
-static QVariant unpack_datetime(const QByteArray &bs)
-{
-    if(bs.size() != 8) {
-        throw MsgPack::MsgPackException("bad datetime.");
-    }
-#if QT_VERSION_CHECK(5, 7, 0)
-    quint64 t = qFromBigEndian<quint64>(static_cast<const void*>(bs.constData()));
-#else
-    quint64 t = qFromBigEndian<quint64>(static_cast<const uchar*>(bs.constData()));
-#endif
-    if (t == 0) {
-        return QDateTime();
-    }
-    qint64 msecs = (t & 0x00000003ffffffffL) * 1000 + (t >> 34) / 1000;
-    return QDateTime::fromMSecsSinceEpoch(msecs);
-}
-
-
-MessagePackSerialization::MessagePackSerialization()
-{
-    MsgPack::registerPacker(QMetaType::QDateTime, -1, pack_datetime);
-    MsgPack::registerUnpacker(-1, unpack_datetime);
-}
-
 
 QByteArray MessagePackSerialization::pack(const QVariant &obj)
 {
-    try {
-        return MsgPack::pack(saveState(obj));
-    } catch (MsgPack::MsgPackException &e) {
-        qDebug() << e.what();
+    QByteArray buf;
+    qtng::MsgPackStream ds(&buf, QIODevice::WriteOnly);
+    ds << saveState(obj);
+    if (ds.status() != qtng::MsgPackStream::Ok) {
         throw RpcSerializationException();
     }
+    return buf;
 }
 
 
 QVariant MessagePackSerialization::unpack(const QByteArray &data)
 {
-    try {
-        return restoreState(MsgPack::unpack(data));
-    } catch (MsgPack::MsgPackException &e) {
+    qtng::MsgPackStream ds(data);
+    QVariant v;
+    ds >> v;
+    if(ds.status() != qtng::MsgPackStream::Ok) {
         throw RpcSerializationException();
     }
+    return restoreState(v);
 }
 
 

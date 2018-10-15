@@ -1,17 +1,17 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
-PROJECT(laf_rpc)
+project(laf_rpc)
 
-IF(ANDROID)
-    FIND_PACKAGE(Qt5Core CONFIG REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
-ELSE()
-    FIND_PACKAGE(Qt5Core REQUIRED)
-ENDIF()
+if(ANDROID)
+    find_package(Qt5Core CONFIG REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
+else()
+    find_package(Qt5Core REQUIRED)
+endif()
 
-SET(CMAKE_AUTOMOC ON)
-SET(CMAKE_INCLUDE_CURRENT_DIR ON)
+option(LAFRPC_BUILD_TESTS OFF)
+set(CMAKE_AUTOMOC ON)
 
-SET(LAFRPC_SRC
+set(LAFRPC_SRC
     src/peer.cpp
     src/rpc.cpp
     src/serialization.cpp
@@ -19,10 +19,9 @@ SET(LAFRPC_SRC
     src/transport.cpp
     src/tran_crypto.cpp
     src/sendfile.cpp
-    qtnetworkng/contrib/data_channel.cpp
 )
 
-SET(LAFRPC_INCLUDE
+set(LAFRPC_INCLUDE
     include/peer.h
     include/rpc.h
     include/utils.h
@@ -32,29 +31,33 @@ SET(LAFRPC_INCLUDE
     include/rpc_p.h
     include/tran_crypto.h
     include/sendfile.h
-    qtnetworkng/contrib/data_channel.h
 )
 
-ADD_SUBDIRECTORY(qtnetworkng)
-ADD_SUBDIRECTORY(qmsgpack)
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    add_subdirectory(../../qtnetworkng/ qtnetworkng)
+else()
+    add_subdirectory(qtnetworkng)
+endif()
 
 # Fix Qt-static cmake BUG
 # https://bugreports.qt.io/browse/QTBUG-38913
-IF((EXISTS ${_qt5Core_install_prefix}/lib/libQt5Core.so) OR
-   (EXISTS ${_qt5Core_install_prefix}/lib/Qt5Core.dll) OR
+if((EXISTS ${_qt5Core_install_prefix}/lib/libQt5Core.so) OR
    (EXISTS ${_qt5Core_install_prefix}/lib64/libQt5Core.so) OR
-   (EXISTS ${_qt5Core_install_prefix}/lib64/Qt5Core.dll))
-    MESSAGE("Shared Qt is detected.")
-ELSE()
-    MESSAGE("Static Qt is detected.")
-    LINK_DIRECTORIES(${_qt5Core_install_prefix}/lib/)
-ENDIF()
+   (EXISTS ${_qt5Core_install_prefix}/bin/Qt5Core.dll))
+    message("Shared Qt is detected.")
+else()
+    message("Static Qt is detected.")
+    link_directories(${_qt5Core_install_prefix}/lib/)
+endif()
 
-ADD_LIBRARY(laf_rpc STATIC ${LAFRPC_SRC} ${LAFRPC_INCLUDE})
-TARGET_LINK_LIBRARIES(laf_rpc qtnetworkng qmsgpack)
+add_library(laf_rpc STATIC ${LAFRPC_SRC} ${LAFRPC_INCLUDE})
+target_link_libraries(laf_rpc PUBLIC qtnetworkng)
+target_include_directories(laf_rpc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(rpctest tests/simple_test.cpp)
-target_link_libraries(rpctest Qt5::Core laf_rpc)
+if(LAFRPC_BUILD_TESTS)
+    add_executable(rpctest tests/simple_test.cpp)
+    target_link_libraries(rpctest Qt5::Core laf_rpc)
 
-add_executable(sendfiletest tests/sendfile.cpp)
-target_link_libraries(sendfiletest PRIVATE Qt5::Core laf_rpc)
+    add_executable(sendfiletest tests/sendfile.cpp)
+    target_link_libraries(sendfiletest PRIVATE Qt5::Core laf_rpc)
+endif()

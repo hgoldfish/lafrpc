@@ -2,8 +2,7 @@
 #define LAFRPC_TRANSPORT_H
 
 #include <QtCore/QDateTime>
-#include "../qtnetworkng/qtnetworkng.h"
-#include "../qtnetworkng/contrib/data_channel.h"
+#include "qtnetworkng.h"
 #include "utils.h"
 
 BEGIN_LAFRPC_NAMESPACE

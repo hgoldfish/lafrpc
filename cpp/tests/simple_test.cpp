@@ -72,19 +72,7 @@ public:
             qDebug() << "can not create rpc server.";
             return;
         }
-
-        qtng::PrivateKey key = qtng::PrivateKey::generate(qtng::PrivateKey::Rsa, 2048);
-        QMultiMap<qtng::Certificate::SubjectInfo, QString> info;
-        info.insert(qtng::Certificate::CommonName, "Goldifsh");
-        info.insert(qtng::Certificate::CountryName, "CN");
-        info.insert(qtng::Certificate::Organization, "GigaCores");
-        const QDateTime &now = QDateTime::currentDateTime();
-        const qtng::Certificate &cert = qtng::Certificate::generate(key, qtng::MessageDigest::Sha256,
-                                                        293424, now, now.addYears(10), info);
-        qtng::SslConfiguration config;
-        config.setPrivateKey(key);
-        config.setLocalCertificate(cert);
-        rpc->setSslConfiguration(config);
+        rpc->setSslConfiguration(qtng::SslConfiguration::testPurpose("Qize", "CN", "GigaCores"));
 
         const RpcFunction &shutdown = [rpc](const QVariantList &args, const QVariantMap &kwargs) -> QVariant {
             Q_UNUSED(args);

@@ -1,8 +1,7 @@
 #ifndef LAFRPC_RPC_H
 #define LAFRPC_RPC_H
 
-#include "../qtnetworkng/qtnetworkng.h"
-#include "../qtnetworkng/contrib/data_channel.h"
+#include "qtnetworkng.h"
 #include "utils.h"
 
 BEGIN_LAFRPC_NAMESPACE
@@ -11,6 +10,7 @@ class Peer;
 
 struct AuthCallback
 {
+    virtual ~AuthCallback();
     virtual bool verify(const QString &itsPeerName, const QByteArray &myChallenge, const QByteArray &itsAnswer) = 0;
     virtual QByteArray answer(const QString &itsPeerName, const QByteArray &itsChallenge) = 0;
 };
@@ -18,6 +18,7 @@ struct AuthCallback
 
 struct MakeKeyCallback
 {
+    virtual ~MakeKeyCallback();
     virtual QByteArray encrypt(const QString &itsPeerName, const QByteArray &key) = 0;
     virtual QByteArray decrypt(const QString &itsPeerName, const QByteArray &data) = 0;
 };
@@ -25,6 +26,7 @@ struct MakeKeyCallback
 
 struct HeaderCallback
 {
+    virtual ~HeaderCallback();
     virtual QVariantMap make(Peer *peer, const QString &methodName) = 0;
     virtual bool auth(Peer *peer, const QString &methodName, const QVariantMap &header) = 0;
 };
@@ -32,6 +34,7 @@ struct HeaderCallback
 
 struct LoggingCallback
 {
+    virtual ~LoggingCallback();
     virtual void calling(Peer *peer, const QString &methodName, const QVariantList &args, const QVariantMap &kwargs) = 0;
     virtual void success(Peer *peer, const QString &methodName, const QVariantList &args, const QVariantMap &kwargs, const QVariant &result) = 0;
     virtual void failed(Peer *peer, const QString &methodName , const QVariantList &args, const QVariantMap &kwargs) = 0;

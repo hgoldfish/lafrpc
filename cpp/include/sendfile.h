@@ -12,17 +12,34 @@ class RpcFile: public UseStream
 {
 public:
     typedef std::function<void(qint64 bs, quint64 count, quint64 total)> ProgressCallback;
-    explicit RpcFile(const QString &filePath);
+    explicit RpcFile(const QString &filePath, bool withHash = false);
     explicit RpcFile();
     virtual ~RpcFile() override;
 public:
+    bool calculateHash();
     bool isValid() const;
-    bool writeToPath(const QString &path, ProgressCallback progressCallback = 0);
-    bool readFromPath(const QString &path, ProgressCallback progressCallback = 0);
-    bool writeTo(QFile &f, ProgressCallback progressCallback = 0);
-    bool readFrom(QFile &f, ProgressCallback progressCallback = 0);
+
+    bool writeToPath(const QString &path, ProgressCallback progressCallback = nullptr);
+    bool readFromPath(const QString &path, ProgressCallback progressCallback = nullptr);
+    bool readFromPath(ProgressCallback progressCallback = nullptr);
+    bool writeTo(QFile &f, ProgressCallback progressCallback = nullptr);
+    bool readFrom(QFile &f, ProgressCallback progressCallback = nullptr);
+
+    bool sendall(const QByteArray &data, ProgressCallback progressCallback = nullptr);
+    bool recvall(QByteArray &data, ProgressCallback progressCallback = nullptr);
 public:
-    int size() const;
+    QString name() const;
+    void setName(const QString &name);
+    quint64 size() const;
+    void setSize(quint64 size);
+    QDateTime modified() const;
+    void setModified(const QDateTime &dt);
+    QDateTime created() const;
+    void setCreated(const QDateTime &dt);
+    QDateTime lastAccess() const;
+    void setLastAccess(const QDateTime &dt);
+    QByteArray hash() const;
+    void setHash(const QByteArray &hash);  // sha256
 public:
     QVariantMap saveState();
     bool restoreState(const QVariantMap &state);

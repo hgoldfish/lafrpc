@@ -5,53 +5,63 @@
 #include <QtCore/qvariant.h>
 #include <QtCore/qsharedpointer.h>
 #include <functional>
-#include "../qtnetworkng/qtnetworkng.h"
-#include "../qtnetworkng/contrib/data_channel.h"
+#include "qtnetworkng.h"
 #include "utils.h"
 
 BEGIN_LAFRPC_NAMESPACE
 
 // thrown by Peer::call()
-struct RpcException
+class RpcException
 {
+public:
     RpcException() {}
+    RpcException(const RpcException &other);
+    RpcException(RpcException &&other);
     RpcException(const QString &message): message(message) {}
+    virtual ~RpcException();
+public:
     virtual QString what() const;
     virtual void raise();
     QString message;
 };
 
-struct RpcInternalException: public RpcException
+class RpcInternalException: public RpcException
 {
+public:
     RpcInternalException(): RpcException() {}
     RpcInternalException(const QString &message): RpcException(message) {}
+public:
     virtual QString what() const;
     virtual void raise();
 };
 
 
-struct RpcDisconnectedException: public RpcException
+class RpcDisconnectedException: public RpcException
 {
+public:
     RpcDisconnectedException(): RpcException() {}
     RpcDisconnectedException(const QString &message): RpcException(message) {}
+public:
     virtual QString what() const;
     virtual void raise();
 };
 
 
-struct RpcRemoteException: public RpcException
+class RpcRemoteException: public RpcException
 {
+public:
     RpcRemoteException(): RpcException() {}
     RpcRemoteException(const RpcRemoteException &other) : RpcRemoteException(other.message) {}
     RpcRemoteException(const QString &message): RpcException(message) {}
-    virtual QString what() const;
-    virtual void raise();
-
+public:
+    virtual QString what() const override;
+    virtual void raise() override;
+public:
     // to support serialization.
     QVariantMap saveState() const;
     bool restoreState(const QVariantMap &state);
     static QString lafrpcKey() { return "RpcRemoteException"; }
-
+public:
     // to support user-defined exception.
     virtual QVariant clone();
     static QList<std::function<void(const QVariant &v)>> exceptionHandlers;
@@ -75,10 +85,12 @@ void RpcRemoteException::registerException()
     exceptionHandlers.append(handleException<T>);
 }
 
-struct RpcSerializationException: public RpcException
+class RpcSerializationException: public RpcException
 {
+public:
     RpcSerializationException(): RpcException() {}
     RpcSerializationException(const QString &message): RpcException(message) {}
+public:
     virtual QString what() const;
     virtual void raise();
 };
@@ -111,24 +123,20 @@ struct UseStream
     QSharedPointer<Serialization> serialization;
 
     UseStream()
-        :place(ServerSide | ValueOfResponse), preferRawSocket(true)
+        :place(ServerSide | ValueOfResponse), preferRawSocket(true), ready(new qtng::Event)
     {}
 
     virtual ~UseStream();
 
-    void setRpc(const QPointer<Rpc> &rpc);
+    void init(const QPointer<Rpc> &rpc, QFlags<Place> place, const QSharedPointer<qtng::VirtualChannel> &channel, QSharedPointer<qtng::SocketLike> rawSocket);
 
-    void setReady(QFlags<Place> place, const QSharedPointer<qtng::VirtualChannel> &channel)
+    void setReady()
     {
         ready->set();
-        this->place = place;
-        this->channel = channel;
     }
 
     void waitForReady()
     {
-        if(ready->isSet())
-            return;
         ready->wait();
     }
 

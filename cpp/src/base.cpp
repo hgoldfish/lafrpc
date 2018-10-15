@@ -7,6 +7,19 @@ BEGIN_LAFRPC_NAMESPACE
 QList<std::function<void(const QVariant &v)>> RpcRemoteException::exceptionHandlers;
 QList<std::function<QSharedPointer<UseStream>(const QVariant &)>> UseStream::handlers;
 
+
+RpcException::RpcException(const RpcException &other)
+    :message(other.message)
+{}
+
+RpcException::~RpcException() {}
+
+RpcException::RpcException(RpcException &&other)
+{
+    qSwap(message, other.message);
+}
+
+
 void RpcException::raise()
 {
     throw *this;
@@ -122,10 +135,13 @@ QString RpcSerializationException::what() const
 
 UseStream::~UseStream() {}
 
-void UseStream::setRpc(const QPointer<Rpc> &rpc)
+
+void UseStream::init(const QPointer<Rpc> &rpc, QFlags<Place> place, const QSharedPointer<qtng::VirtualChannel> &channel, QSharedPointer<qtng::SocketLike> rawSocket)
 {
-    ready.reset(new qtng::Event);
     serialization = rpc->serialization();
+    this->place = place;
+    this->channel = channel;
+    this->rawSocket = rawSocket;
 }
 
 

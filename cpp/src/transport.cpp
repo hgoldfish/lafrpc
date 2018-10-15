@@ -1,4 +1,5 @@
-#include <QtCore/QDateTime>
+#include <QtCore/qdatetime.h>
+#include <QtCore/qurl.h>
 #include "../include/transport.h"
 #include "../include/rpc.h"
 #include "../include/tran_crypto.h"
@@ -24,22 +25,13 @@ TcpTransport::~TcpTransport()
 
 bool TcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
 {
-    if (!address.startsWith("tcp://")) {
+    QUrl u(address);
+    if (!u.isValid() || u.scheme() != "tcp" || u.port() <= 0) {
         return false;
     }
-    QString payload = address;
-    payload.remove(0, 6); // remove tcp://
-    
-    int pos = payload.indexOf(QChar(':'));
-    if (pos <= 0) {
-        return false;
-    }
-    QString hostStr = payload.left(pos);
-    QString portStr = payload.mid(pos + 1);
-    bool ok;
-    *host = QHostAddress(hostStr);
-    *port = portStr.toUInt(&ok);
-    if(!ok || host->isNull()) {
+    *host = QHostAddress(u.host());
+    *port = static_cast<quint16>(u.port());
+    if(host->isNull()) {
         return false;
     }
     *socket = qtng::SocketLike::rawSocket(new qtng::Socket);
@@ -75,10 +67,15 @@ bool TcpTransport::startServer(const QString &address)
     }
     while(true) {
         QSharedPointer<qtng::SocketLike> request = serverSocket->accept();
+        if (request.isNull()) {
+            break;
+        }
+        qDebug() << "got new request.";
         operations->spawn([request, this] {
             this->handleRequest(request);
         });
     }
+    return true;
 }
 
 
@@ -186,22 +183,13 @@ bool TcpTransport::canHandle(const QString &address)
 
 bool SslTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
 {
-    if (!address.startsWith("ssl://")) {
+    QUrl u(address);
+    if (!u.isValid() || u.scheme() != "ssl" || u.port() <= 0) {
         return false;
     }
-    QString payload = address;
-    payload.remove(0, 6); // remove ssl://
-    
-    int pos = payload.indexOf(QChar(':'));
-    if (pos <= 0) {
-        return false;
-    }
-    QString hostStr = payload.left(pos);
-    QString portStr = payload.mid(pos + 1);
-    bool ok;
-    *host = QHostAddress(hostStr);
-    *port = portStr.toUInt(&ok);
-    if(!ok || host->isNull()) {
+    *host = QHostAddress(u.host());
+    *port = static_cast<quint16>(u.port());
+    if(host->isNull()) {
         return false;
     }
     *socket = qtng::SocketLike::sslSocket(new qtng::SslSocket(qtng::Socket::AnyIPProtocol, config));

@@ -11,10 +11,14 @@
 
 BEGIN_LAFRPC_NAMESPACE
 
+AuthCallback::~AuthCallback() {}
+MakeKeyCallback::~MakeKeyCallback() {}
+HeaderCallback::~HeaderCallback() {}
+LoggingCallback::~LoggingCallback() {}
+
 RpcPrivate::RpcPrivate(const QString &myPeerName, const QSharedPointer<Serialization> &serialization, Rpc *parent)
-    :myPeerName(myPeerName), serialization(serialization), operations(new qtng::CoroutineGroup), q_ptr(parent)
+    :myPeerName(myPeerName), timeout(10.0), serialization(serialization), operations(new qtng::CoroutineGroup), q_ptr(parent)
 {
-    timeout = 5.0;
     if(this->serialization.isNull()) {
         this->serialization.reset(new JsonSerialization());
     }
@@ -180,7 +184,9 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerName)
         QSharedPointer<Peer> peer = preparePeer(channel, knownAddresses.contains(peerName) ? peerName : QString(), peerAddress);
         event->set();
         connectingEvents.remove(peerAddress);
-        knownAddresses[peer->name()] = peerAddress;
+        if (!peer.isNull()) {
+            knownAddresses[peer->name()] = peerAddress;
+        }
         return peer;
     } catch (...) {
         event->set();
@@ -210,19 +216,14 @@ QSharedPointer<qtng::SocketLike> RpcPrivate::makeRawSocket(const QString &peerNa
 
 QSharedPointer<qtng::SocketLike> RpcPrivate::getRawSocket(const QString &peerName, const QByteArray &connectionId)
 {
-    const QString &address = knownAddresses.value(peerName);
-    if(address.isEmpty()) {
-        qDebug() << QStringLiteral("the address of %1 is not known.").arg(peerName);
-        return QSharedPointer<qtng::SocketLike>();
+    Q_UNUSED(peerName);
+    for (QSharedPointer<Transport> transport: transports) {
+        QSharedPointer<qtng::SocketLike> rawSocket = transport->getRawSocket(connectionId);
+        if (!rawSocket.isNull()) {
+            return rawSocket;
+        }
     }
-
-    QSharedPointer<Transport> transport = findTransport(address);
-    if(transport.isNull()) {
-        qDebug() << "address is not supported." << address;
-        return QSharedPointer<qtng::SocketLike>();
-    }
-
-    return transport->getRawSocket(connectionId);
+    return QSharedPointer<qtng::SocketLike>();
 }
 
 
@@ -431,7 +432,7 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
 #endif
                 QSharedPointer<qtng::Event> waiter(new qtng::Event());
                 waiters.insert(itsPeerName, waiter);
-                {
+                try {
                     qtng::Timeout _(timeout);
                     if(!waiter->wait()) {
 #ifdef DEUBG_RPC_PROTOCOL
@@ -439,6 +440,9 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
 #endif
                         return empty;
                     }
+                } catch (qtng::TimeoutException &) {
+                    qDebug() << "Rpc::preparePeer() -> timeout to wait for another handshake.";
+                    return empty;
                 }
                 QSharedPointer<Peer> t = peers.value(itsPeerName);
                 if(t.isNull()) {
