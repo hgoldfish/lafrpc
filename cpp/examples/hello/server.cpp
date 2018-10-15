@@ -1,5 +1,5 @@
 // server.cpp
-#include "laf_rpc/cpp/laf_rpc.h"
+#include "laf_rpc.h"
 
 using namespace laf_rpc;
 
