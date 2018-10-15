@@ -62,9 +62,6 @@ The cmake build file:
     PROJECT(pbook)
 
     SET(CMAKE_AUTOMOC ON)
-    set(CMAKE_AUTOUIC ON)
-    SET(CMAKE_INCLUDE_CURRENT_DIR ON)
-    SET(CMAKE_CXX_STANDARD 11)
 
     FIND_PACKAGE(Qt5Core REQUIRED)
 
@@ -75,18 +72,18 @@ The cmake build file:
 
     TARGET_LINK_LIBRARIES(server Qt5::Core laf_rpc)
     TARGET_LINK_LIBRARIES(client Qt5::Core laf_rpc)
-    
+
 Now your project have 3 files:
 
     hello/
         server.cpp
         client.cpp
         CMakeLists.cpp
-        
+
 Clone this project to project directory:
 
     git clone --recursive https://github.com/hgoldfish/laf_rpc
-    
+
 Then you have 3 files and a subdirectory:
 
     hello/
@@ -94,7 +91,7 @@ Then you have 3 files and a subdirectory:
         client.cpp
         CMakeLists.txt
         laf_rpc/
-        
+
 Build and test:
 
     mkdir build
@@ -102,4 +99,3 @@ Build and test:
     make -j8
     ./server
     ./client   # in another console.
-    
