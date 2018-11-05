@@ -51,7 +51,7 @@ bool RpcPrivate::setSslConfiguration(const qtng::SslConfiguration &config)
 
 inline QSharedPointer<Transport> RpcPrivate::findTransport(const QString &address)
 {
-    for(QSharedPointer<Transport> transport: transports) {
+    for (QSharedPointer<Transport> transport: transports) {
         if (transport->canHandle(address)) {
             return transport;
         }
@@ -70,7 +70,7 @@ QList<bool> RpcPrivate::startServers(const QStringList &addresses, bool blocking
 {
     QList<bool> result;
     QList<QSharedPointer<qtng::Coroutine>> coroutines;
-    for(QString address: addresses) {
+    for (QString address: addresses) {
         if(serverAddressList.contains(address)) {
             result.append(true);
             continue;
@@ -106,7 +106,7 @@ QList<bool> RpcPrivate::stopServers(const QStringList &addresses)
     } else {
         serverAddressList = addresses;
     }
-    for(const QString &address: serverAddressList) {
+    for (const QString &address: serverAddressList) {
         const QString &workerName = makeWorkerName(address);
         bool success = operations->kill(workerName);
         result.append(success);
@@ -119,7 +119,7 @@ QList<bool> RpcPrivate::stopServers(const QStringList &addresses)
 void RpcPrivate::shutdown()
 {
     stopServers(QStringList());
-    for(QSharedPointer<Peer> peer: this->peers.values()) {
+    for (QSharedPointer<Peer> peer: this->peers.values()) {
         peer->close();
     }
     peers.clear();
@@ -256,7 +256,7 @@ QPointer<Peer> RpcPrivate::getCurrentPeer()
     if(!localStore.contains(coroutineId)) {
         return QPointer<Peer>();
     }
-    const PeerAndHeader &t = localStore[qtng::Coroutine::current()->id()];
+    const PeerAndHeader &t = localStore[coroutineId];
     return t.peer;
 }
 

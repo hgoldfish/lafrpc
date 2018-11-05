@@ -11,7 +11,7 @@ class RpcFilePrivate;
 class RpcFile: public UseStream
 {
 public:
-    typedef std::function<void(qint64 bs, quint64 count, quint64 total)> ProgressCallback;
+    typedef std::function<bool(qint64 bs, quint64 count, quint64 total)> ProgressCallback;
     explicit RpcFile(const QString &filePath, bool withHash = false);
     explicit RpcFile();
     virtual ~RpcFile() override;

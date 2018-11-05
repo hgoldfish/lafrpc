@@ -123,7 +123,7 @@ struct UseStream
     QSharedPointer<Serialization> serialization;
 
     UseStream()
-        :place(ServerSide | ValueOfResponse), preferRawSocket(true), ready(new qtng::Event)
+        :place(ServerSide | ValueOfResponse), preferRawSocket(false), ready(new qtng::Event)
     {}
 
     virtual ~UseStream();

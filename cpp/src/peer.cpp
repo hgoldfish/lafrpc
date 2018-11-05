@@ -150,7 +150,7 @@ void PeerPrivate::shutdown()
     }
     broken = true;
     QSharedPointer<Response> emptyResponse(new Response());
-    for(QMap<QByteArray, QSharedPointer<Waiter>>::const_iterator itor = waiters.constBegin(); itor != waiters.constEnd(); ++itor) {
+    for (QMap<QByteArray, QSharedPointer<Waiter>>::const_iterator itor = waiters.constBegin(); itor != waiters.constEnd(); ++itor) {
         itor.value()->send(emptyResponse);
     }
     waiters.clear();
@@ -459,7 +459,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
             throw;
         } catch (RpcRemoteException &e) {
             response.exception = e.clone();
-            qDebug() << response.exception;
+            qDebug() << e.what();
         } catch (...) {
             QSharedPointer<RpcRemoteException> e(new RpcRemoteException("unknown exception caught."));
             response.exception.setValue(e);
@@ -563,7 +563,7 @@ int metaTypeOf(const char *typeName)
     QByteArray toFound(typeName);
     removeNamespace(toFound);
 
-    for(int i = QMetaType::User;; ++i) {
+    for (int i = QMetaType::User;; ++i) {
         const char *s = QMetaType::typeName(i);
         if (!s) {
             return 0;
@@ -581,6 +581,7 @@ int metaTypeOf(const char *typeName)
 
 QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, QVariantMap kwargs)
 {
+    Q_UNUSED(kwargs);
     const QMetaObject *metaObj = obj->metaObject();
     if (!metaObj) {
         throw RpcRemoteException("obj is not callable.");
@@ -621,10 +622,15 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
         const QByteArray &typeName = parameterTypeNames.at(i);
         const QByteArray &parameterName = parameterNames.at(i);
         QVariant &arg = args[i];
-        if (!arg.convert(typeId)) {
-            QString message = "the parameter %1 with type %2 can not accept the past argument.";
-            message = message.arg(QString::fromUtf8(parameterName)).arg(QString::fromUtf8(typeName));
-            throw RpcRemoteException(message);
+        if (arg.isValid()) {
+            if (!arg.convert(typeId)) {
+                QString message = "the parameter %1 with type %2 can not accept the past argument.";
+                message = message.arg(QString::fromUtf8(parameterName)).arg(QString::fromUtf8(typeName));
+                throw RpcRemoteException(message);
+            }
+        } else {
+            void *obj = QMetaType::create(typeId);
+            arg = QVariant(typeId, obj);
         }
         parameters.append(QGenericArgument(typeName.constData(), arg.constData()));
     }

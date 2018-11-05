@@ -65,7 +65,10 @@ bool RpcFilePrivate::sendfileViaChannel(QIODevice *f, RpcFile::ProgressCallback 
             return false;
         } else {
             count += static_cast<quint64>(readBytes);
-            progressCallback(readBytes, count, size);
+            bool keepGo = progressCallback(readBytes, count, size);
+            if (!keepGo) {
+                return false;
+            }
         }
     }
     return true;
@@ -104,7 +107,10 @@ bool RpcFilePrivate::recvfileViaChannel(QIODevice *f, RpcFile::ProgressCallback 
         if (doHash) {
             hasher.addData(buf);
         }
-        progressCallback(buf.size(), count, size);
+        bool keepGo = progressCallback(buf.size(), count, size);
+        if (!keepGo) {
+            return false;
+        }
     }
     if (doHash) {
         const QByteArray &myHash = hasher.result();
@@ -145,7 +151,10 @@ bool RpcFilePrivate::sendfileViaRawSocket(QIODevice *f, RpcFile::ProgressCallbac
             return false;
         } else {
             count += static_cast<quint64>(readBytes);
-            progressCallback(readBytes, count, size);
+            bool keepGo = progressCallback(readBytes, count, size);
+            if (!keepGo) {
+                return false;
+            }
         }
     }
     return true;
@@ -183,7 +192,10 @@ bool RpcFilePrivate::recvfileViaRawSocket(QIODevice *f, RpcFile::ProgressCallbac
         if (doHash) {
             hasher.addData(buf);
         }
-        progressCallback(buf.size(), count, size);
+        bool keepGo = progressCallback(buf.size(), count, size);
+        if (!keepGo) {
+            return false;
+        }
     }
     if (doHash) {
         const QByteArray &myHash = hasher.result();
@@ -249,8 +261,9 @@ bool RpcFile::isValid() const
 }
 
 
-inline void defaultProgressCallback(qint64, quint64, quint64)
+inline bool defaultProgressCallback(qint64, quint64, quint64)
 {
+    return true;
 }
 
 

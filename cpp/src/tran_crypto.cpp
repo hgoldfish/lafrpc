@@ -7,7 +7,7 @@ QByteArray urandom(int bytes)
     QByteArray randomBytes;
     randomBytes.reserve(bytes);
     // TODO sizeof(int) every turn
-    for(int i = 0; i < bytes; ++i) {
+    for (int i = 0; i < bytes; ++i) {
         uchar c = qrand() % 256;
         randomBytes.append(static_cast<char>(c));
     }

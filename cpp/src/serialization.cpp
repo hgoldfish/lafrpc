@@ -35,19 +35,19 @@ QVariant Serialization::saveState(const QVariant &obj)
     } else if(type == QVariant::List) {
         const QVariantList &l = obj.toList();
         QVariantList result;
-        for(const QVariant &e: l) {
+        for (const QVariant &e: l) {
             result.append(saveState(e));
         }
         return result;
     } else if(type == QVariant::Map) {
         const QVariantMap &d = obj.toMap();
         QVariantMap result;
-        for(QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
+        for (QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
             result.insert(itor.key(), saveState(itor.value()));
         }
         return result;
     } else {
-        for(QMap<QString, SerializableInfo>::const_iterator itor = classes.constBegin(); itor != classes.constEnd(); ++itor) {
+        for (QMap<QString, SerializableInfo>::const_iterator itor = classes.constBegin(); itor != classes.constEnd(); ++itor) {
             const SerializableInfo &info = itor.value();
             if(info.metaTypeId == obj.userType()) {
                 void *p = info.serializer->toVoid(obj);
@@ -56,7 +56,7 @@ QVariant Serialization::saveState(const QVariant &obj)
                 }
                 const QVariantMap &d = info.serializer->saveState(p);
                 QVariantMap result;
-                for(QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
+                for (QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
                     result.insert(itor.key(), saveState(itor.value()));
                 }
                 result[Serialization::SpecialSidKey] = itor.key();
@@ -85,14 +85,14 @@ QVariant Serialization::restoreState(const QVariant &data)
     } else if (type == QVariant::List) {
         const QVariantList &l = data.toList();
         QVariantList result;
-        for(const QVariant &e: l) {
+        for (const QVariant &e: l) {
             result.append(restoreState(e));
         }
         return result;
     } else if (type == QVariant::Map) {
         const QVariantMap &d = data.toMap();
         QVariantMap result;
-        for(QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
+        for (QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
             result.insert(itor.key(), restoreState(itor.value()));
         }
         if(result.contains(Serialization::SpecialSidKey)) {
@@ -137,14 +137,14 @@ QVariant convertDateTime(const QVariant &obj)
     } else if(type == QVariant::List) {
         const QVariantList &l = obj.toList();
         QVariantList result;
-        foreach(const QVariant &e, l) {
+        for (const QVariant &e: l) {
             result.append(convertDateTime(e));
         }
         return result;
     } else if(type == QVariant::Map) {
         const QVariantMap &d = obj.toMap();
         QVariantMap result;
-        for(QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
+        for (QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
             result.insert(itor.key(), convertDateTime(itor.value()));
         }
         return result;
