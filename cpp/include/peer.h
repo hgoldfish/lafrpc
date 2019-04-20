@@ -21,8 +21,7 @@ class Peer: public RegisterServiceMixin<QObject>
 {
     Q_OBJECT
 public:
-    Peer(const QString &name, const QSharedPointer<qtng::DataChannel> &channel,
-            const QPointer<Rpc> &rpc, const QByteArray &key);
+    Peer(const QString &name, const QSharedPointer<qtng::DataChannel> &channel, const QPointer<Rpc> &rpc);
     virtual ~Peer();
 public:
     void shutdown();

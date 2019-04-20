@@ -11,11 +11,11 @@ class Rpc;
 class Transport
 {
 public:
-    Transport(const QPointer<Rpc> &rpc)
+    Transport(QPointer<Rpc> rpc)
         :rpc(rpc) {}
     virtual ~Transport();
 public:
-    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address, float timeout = 0.0) = 0;
+    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address, float timeout = 0.0f) = 0;
     virtual bool startServer(const QString &address) = 0;
     virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray *connectionId) = 0;
     virtual QSharedPointer<qtng::SocketLike> getRawSocket(const QByteArray &connectionId) = 0;
@@ -38,10 +38,10 @@ struct RawSocket
 class TcpTransport: public Transport
 {
 public:
-    TcpTransport(const QPointer<Rpc> &rpc);
+    explicit TcpTransport(QPointer<Rpc> rpc);
     virtual ~TcpTransport() override;
 public:
-    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address, float timeout = 0.0) override;
+    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address, float timeout = 0.0f) override;
     virtual bool startServer(const QString &address) override;
     virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray *connectionId) override;
     virtual QSharedPointer<qtng::SocketLike> getRawSocket(const QByteArray &connectionId) override;
@@ -49,6 +49,8 @@ public:
 protected:
     void handleRequest(QSharedPointer<qtng::SocketLike> request);
     virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port);
+    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel);
+    virtual QString getAddressTemplate();
 private:
     QMap<QByteArray, RawSocket> rawConnections;
     qtng::CoroutineGroup *operations;
@@ -58,16 +60,89 @@ private:
 class SslTransport: public TcpTransport
 {
 public:
-    SslTransport(const QPointer<Rpc> &rpc)
+    explicit SslTransport(QPointer<Rpc> rpc)
         : TcpTransport(rpc) {}
 public:
     void setSslConfiguration(const qtng::SslConfiguration &config) {this->config = config; }
 protected:
     virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
     virtual bool canHandle(const QString &address) override;
+    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel) override;
+    virtual QString getAddressTemplate() override;
 private:
     qtng::SslConfiguration config;
 };
+
+
+class KcpTransport: public TcpTransport
+{
+public:
+    explicit KcpTransport(QPointer<Rpc> rpc)
+        : TcpTransport(rpc) {}
+protected:
+    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
+    virtual bool canHandle(const QString &address) override;
+    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel) override;
+    virtual QString getAddressTemplate() override;
+};
+
+
+class KcpSslTransport: public TcpTransport
+{
+public:
+    explicit KcpSslTransport(QPointer<Rpc> rpc)
+        : TcpTransport(rpc) {}
+public:
+    void setSslConfiguration(const qtng::SslConfiguration &config) {this->config = config; }
+protected:
+    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
+    virtual bool canHandle(const QString &address) override;
+    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel) override;
+    virtual QString getAddressTemplate() override;
+private:
+    qtng::SslConfiguration config;
+};
+
+
+class HttpTransport: public Transport
+{
+public:
+    explicit HttpTransport(QPointer<Rpc> rpc)
+        :Transport(rpc), rootDir(QDir::current()) {}
+public:
+    void setSslConfiguration(const qtng::SslConfiguration &config) {this->config = config; }
+    void setRootDir(const QDir &rootDir) { this->rootDir = rootDir; }
+public:
+    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address, float timeout = 0.0f) override;
+    virtual bool startServer(const QString &address) override;
+    virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray *connectionId) override;
+    virtual QSharedPointer<qtng::SocketLike> getRawSocket(const QByteArray &connectionId) override;
+    virtual bool canHandle(const QString &address) override;
+private:
+    QMap<QByteArray, RawSocket> rawConnections;
+    qtng::CoroutineGroup *operations;
+    qtng::SslConfiguration config;
+    qtng::HttpSession session;
+    QDir rootDir;
+    friend class HasHttpTransport;
+    friend class LafrpcHttpRequestHandler;
+};
+
+
+//class HttpTcpTransport: public Transport
+//{
+//public:
+//    HttpTcpTransport(QPointer<Rpc> rpc, bool https)
+//        :Transport(rpc), https(https) {}
+//public:
+//    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address, float timeout = 0.0) override;
+//    virtual bool startServer(const QString &address) override;
+//    virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray *connectionId) override;
+//    virtual QSharedPointer<qtng::SocketLike> getRawSocket(const QByteArray &connectionId) override;
+//    virtual bool canHandle(const QString &address) override;
+//private:
+//    bool https;
+//};
 
 END_LAFRPC_NAMESPACE
 

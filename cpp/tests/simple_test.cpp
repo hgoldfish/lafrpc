@@ -1,10 +1,13 @@
 #include <QtCore/QCoreApplication>
-#include "../laf_rpc.h"
+#include "lafrpc.h"
 
 
-using namespace laf_rpc;
+using namespace lafrpc;
 
-const QString addr = "ssl://127.0.0.1:7942";
+//const QString ServerAddress = "https://127.0.0.1:8443/lafrpc";
+//const QString ClientAddress = "ssl://127.0.0.1:8443/";
+const QString ServerAddress = "kcp+ssl://127.0.0.1:8443/";
+const QString ClientAddress = "kcp+ssl://127.0.0.1:8443/";
 
 class Demo: public QObject
 {
@@ -67,17 +70,19 @@ class ServerCoroutine: public qtng::Coroutine
 public:
     virtual void run()
     {
-        QSharedPointer<Rpc> rpc = Rpc::use("server", "msgpack");
+        QSharedPointer<Rpc> rpc = Rpc::builder(MessagePack)
+                .myPeerName("server")
+                .sslConfiguration(qtng::SslConfiguration::testPurpose("lafrpc", "CN", "QtNetworkNg"))
+                .create();
         if(rpc.isNull()) {
             qDebug() << "can not create rpc server.";
             return;
         }
-        rpc->setSslConfiguration(qtng::SslConfiguration::testPurpose("Qize", "CN", "GigaCores"));
-
-        const RpcFunction &shutdown = [rpc](const QVariantList &args, const QVariantMap &kwargs) -> QVariant {
-            Q_UNUSED(args);
-            Q_UNUSED(kwargs);
-            rpc->close();
+        const RpcFunction &shutdown = [rpc](const QVariantList &, const QVariantMap &) -> QVariant {
+            qtng::callInEventLoopAsync([rpc] {
+                rpc->shutdown();
+            }, 500);
+            qDebug() << "shuting down server.";
             return true;
         };
         QSharedPointer<Demo> demo(new Demo());
@@ -86,7 +91,8 @@ public:
         rpc->registerFunction(shutdown, "shutdown");
         rpc->registerInstance(demo, "demo");
         rpc->registerInstance(echo, "echo");
-        rpc->startServer(addr, true);
+        rpc->startServer(ServerAddress, true);
+        qDebug() << "server exit.";
     }
 };
 
@@ -98,12 +104,12 @@ public:
     {
         msleep(100);
         qDebug() << "client started.";
-        QSharedPointer<Rpc> rpc = Rpc::use("client", "msgpack");
+        QSharedPointer<Rpc> rpc = Rpc::builder(MessagePack).myPeerName("client").create();
         if(rpc.isNull()) {
             qDebug() << "can not create rpc client.";
             return;
         }
-        QSharedPointer<Peer> peer = rpc->connect(addr);
+        QSharedPointer<Peer> peer = rpc->connect(ClientAddress);
         if(peer.isNull()) {
             qDebug() << "can not connect to rpc server.";
             return;
@@ -122,12 +128,14 @@ public:
             qDebug() << peer->call("sum", args);
         }
         peer->call("shutdown");
+        qDebug() << "client exit.";
     }
 };
 
 
 int main(int argc, char **argv)
 {
+    QCoreApplication app(argc, argv);
     qtng::CoroutineGroup operations;
     operations.start(new ServerCoroutine(), "server");
     operations.start(new ClientCoroutine(), "cient");

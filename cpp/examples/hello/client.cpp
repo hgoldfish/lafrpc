@@ -1,11 +1,11 @@
 // client.cpp
-#include "laf_rpc.h"
+#include "lafrpc.h"
 
-using namespace laf_rpc;
+using namespace lafrpc;
 
 int main(int argc, char **argv)
 {
-    QSharedPointer<Rpc> rpc = Rpc::use("client", "msgpack");
+    QSharedPointer<Rpc> rpc = RpcBuilder(MessagePack).myPeerName("client").create();
     if(rpc.isNull()) {
         qDebug() << "can not create rpc server.";
         return 1;

@@ -3,7 +3,10 @@
 #include <QtCore/qdebug.h>
 #include <QtCore/qcryptographichash.h>
 #include <QtCore/qbuffer.h>
+#include <QtCore/qloggingcategory.h>
 #include "../include/sendfile.h"
+
+static Q_LOGGING_CATEGORY(logger, "lafrpc.sendfile")
 
 BEGIN_LAFRPC_NAMESPACE
 
@@ -51,7 +54,7 @@ bool RpcFilePrivate::sendfileViaChannel(QIODevice *f, RpcFile::ProgressCallback 
     while(count < size) {
         qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
         if (readBytes < 0) {
-            qWarning() << "rpc file read error:" << f->errorString();
+            qCWarning(logger) << "rpc file read error:" << f->errorString();
             progressCallback(-1, count, size);
             return false;
         } else if (readBytes == 0) {
@@ -60,7 +63,7 @@ bool RpcFilePrivate::sendfileViaChannel(QIODevice *f, RpcFile::ProgressCallback 
         }
         bool success = q->channel->sendPacket(QByteArray(buf, static_cast<int>(readBytes)));
         if (!success) {
-            qDebug() << "rpc file send error.";
+            qCDebug(logger) << "rpc file send error.";
             progressCallback(-1, count, size);
             return false;
         } else {
@@ -89,17 +92,17 @@ bool RpcFilePrivate::recvfileViaChannel(QIODevice *f, RpcFile::ProgressCallback 
     while(count < size) {
         const QByteArray &buf = q->channel->recvPacket();
         if (buf.isEmpty()) {
-            qWarning() << "rpc file receiving error.";
+            qCWarning(logger) << "rpc file receiving error.";
             progressCallback(-1, count, size);
             return false;
         }
         qint64 writtenBytes = f->write(buf);
         if (writtenBytes < 0) {
-            qWarning() << "rpc file write error:" << f->errorString();
+            qCWarning(logger) << "rpc file write error:" << f->errorString();
             progressCallback(-1, count, size);
             return false;
         } else if (writtenBytes != buf.size()) {
-            qWarning() << "rpc file write error: partial writing.";
+            qCWarning(logger) << "rpc file write error: partial writing.";
             progressCallback(-1, count, size);
             return false;
         }
@@ -115,7 +118,7 @@ bool RpcFilePrivate::recvfileViaChannel(QIODevice *f, RpcFile::ProgressCallback 
     if (doHash) {
         const QByteArray &myHash = hasher.result();
         if (myHash != hash) {
-            qDebug() << "writeTo() got mismatched hash.";
+            qCDebug(logger) << "writeTo() got mismatched hash.";
             return false;
         }
     }
@@ -136,7 +139,7 @@ bool RpcFilePrivate::sendfileViaRawSocket(QIODevice *f, RpcFile::ProgressCallbac
     while(count < size) {
         qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
         if (readBytes < 0) {
-            qWarning() << "rpc file read error:" << f->errorString();
+            qCWarning(logger) << "rpc file read error:" << f->errorString();
             progressCallback(-1, count, size);
             return false;
         } else if (readBytes == 0) {
@@ -146,7 +149,7 @@ bool RpcFilePrivate::sendfileViaRawSocket(QIODevice *f, RpcFile::ProgressCallbac
         // TODO use send() instead of sendall() to maxium the boundrate.
         qint32 bs = q->rawSocket->sendall(buf, static_cast<qint32>(readBytes));
         if (bs != readBytes) {
-            qDebug() << "rpc file send error.";
+            qCDebug(logger) << "rpc file send error.";
             progressCallback(-1, count, size);
             return false;
         } else {
@@ -174,17 +177,17 @@ bool RpcFilePrivate::recvfileViaRawSocket(QIODevice *f, RpcFile::ProgressCallbac
     while(count < size) {
         const QByteArray &buf = q->rawSocket->recv(1024);
         if (buf.isEmpty()) {
-            qWarning() << "rpc file receiving error.";
+            qCWarning(logger) << "rpc file receiving error.";
             progressCallback(-1, count, size);
             return false;
         }
         qint64 writtenBytes = f->write(buf);
         if (writtenBytes < 0) {
-            qWarning() << "rpc file write error:" << f->errorString();
+            qCWarning(logger) << "rpc file write error:" << f->errorString();
             progressCallback(-1, count, size);
             return false;
         } else if (writtenBytes != buf.size()) {
-            qWarning() << "rpc file write error: partial writing.";
+            qCWarning(logger) << "rpc file write error: partial writing.";
             progressCallback(-1, count, size);
             return false;
         }
@@ -200,7 +203,7 @@ bool RpcFilePrivate::recvfileViaRawSocket(QIODevice *f, RpcFile::ProgressCallbac
     if (doHash) {
         const QByteArray &myHash = hasher.result();
         if (myHash != hash) {
-            qDebug() << "recvfile() got mismatched hash.";
+            qCDebug(logger) << "recvfile() got mismatched hash.";
             return false;
         }
     }
@@ -231,6 +234,7 @@ RpcFile::RpcFile()
     :d_ptr(new RpcFilePrivate(this))
 {
 }
+
 
 RpcFile::~RpcFile()
 {

@@ -8,22 +8,6 @@ BEGIN_LAFRPC_NAMESPACE
 
 class Peer;
 
-struct AuthCallback
-{
-    virtual ~AuthCallback();
-    virtual bool verify(const QString &itsPeerName, const QByteArray &myChallenge, const QByteArray &itsAnswer) = 0;
-    virtual QByteArray answer(const QString &itsPeerName, const QByteArray &itsChallenge) = 0;
-};
-
-
-struct MakeKeyCallback
-{
-    virtual ~MakeKeyCallback();
-    virtual QByteArray encrypt(const QString &itsPeerName, const QByteArray &key) = 0;
-    virtual QByteArray decrypt(const QString &itsPeerName, const QByteArray &data) = 0;
-};
-
-
 struct HeaderCallback
 {
     virtual ~HeaderCallback();
@@ -40,54 +24,89 @@ struct LoggingCallback
     virtual void failed(Peer *peer, const QString &methodName , const QVariantList &args, const QVariantMap &kwargs) = 0;
 };
 
+
+struct MagicCodeManager
+{
+    virtual ~MagicCodeManager();
+    virtual QSharedPointer<qtng::BaseRequestHandler> create(const QByteArray &magicCode, QSharedPointer<qtng::SocketLike> request, qtng::BaseStreamServer *server);
+};
+
+
+enum SerializationType{
+    MessagePack,
+    Json,
+    DataStream,
+};
+
+
 class RpcPrivate;
 class Serialization;
 class Crypto;
+class RpcBuilder;
 class Rpc: public RegisterServiceMixin<QObject>
 {
     Q_OBJECT
 public:
-    Rpc(const QString &myPeerName, const QSharedPointer<Serialization> &serialization);
+    Rpc(const QSharedPointer<Serialization> &serialization);
     virtual ~Rpc();
 signals:
     void newPeer(QSharedPointer<Peer> peer);
 public:
-    void setSslConfiguration(const qtng::SslConfiguration &config);
     float timeout() const;
     void setTimeout(float timeout);
     QString myPeerName() const;
-    void setMyPeerName(const QString &name);
     QSharedPointer<Serialization> serialization() const;
     QSharedPointer<Crypto> crypto() const;
+    QSharedPointer<MagicCodeManager> magicCodeManager() const;
+    QSharedPointer<HeaderCallback> headerCallback() const;
     void setHeaderCallback(QSharedPointer<HeaderCallback> headerCallback);
-    void setAuthCallback(QSharedPointer<AuthCallback> authCallbak);
-    void setMakeKeyCallback(QSharedPointer<MakeKeyCallback> makeKeyCallback);
-    void setLoggingCallback(QSharedPointer<LoggingCallback> loggingCallback);
+
     QList<bool> startServers(const QStringList &addresses, bool blocking = true);
     bool startServer(const QString &address, bool blocking = true);
     QList<bool> stopServers(const QStringList &addresses = QStringList());
     bool stopServer(const QString &address);
     void shutdown();
-    void close() { shutdown(); }
+
     QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray *connectionId);
     QSharedPointer<qtng::SocketLike> getRawSocket(const QString &peerName, const QByteArray &connectionId);
-    QSharedPointer<Peer> connect(const QString &peerName);
+    QSharedPointer<Peer> connect(const QString &peerNameOrAddess);
+    QSharedPointer<Peer> get(const QString &peerName) const;
+    QList<QSharedPointer<Peer>> getAllPeers() const;
+
     bool isConnected(const QString &peerName) const;
     bool isConnecting(const QString &peerAddress) const;
-    QSharedPointer<Peer> get(const QString &peerName) const;
     QString address(const QString &peerName) const;
     void setAddress(const QString &peerName, const QString &peerAddress);
-    QList<QSharedPointer<Peer>> getAllPeers() const;
     QPointer<Peer> getCurrentPeer();
     QVariantMap getRpcHeader();
+
     QSharedPointer<Peer> preparePeer(const QSharedPointer<qtng::DataChannel> &channel, const QString &name, const QString &address);    friend class Transport;
 public:
-    static QSharedPointer<Rpc> use(const QString &name, const QString &serialization);
+    static RpcBuilder builder(SerializationType serialization);
 private:
-    Q_DECLARE_PRIVATE(Rpc)
-    RpcPrivate * const d_ptr;
+    Q_DECLARE_PRIVATE_D(dd_ptr, Rpc)
+    RpcPrivate * const dd_ptr;
 private:
     friend class PeerPrivate;
+    friend class RpcBuilder;
+};
+
+
+class RpcBuilder
+{
+public:
+    RpcBuilder(SerializationType serialization);
+public:
+    RpcBuilder &sslConfiguration(const qtng::SslConfiguration &sslConfiguration);
+    RpcBuilder &headerCallback(QSharedPointer<HeaderCallback> headerCallback);
+    RpcBuilder &loggingCallback(QSharedPointer<LoggingCallback> loggingCallback);
+    RpcBuilder &magicCodeManager(QSharedPointer<MagicCodeManager> magicCodeManager);
+    RpcBuilder &timeout(float timeout);
+    RpcBuilder &myPeerName(const QString &myPeerName);
+    RpcBuilder &httpRootDir(const QDir &rootDir);
+    QSharedPointer<Rpc> create();
+private:
+    QSharedPointer<Rpc> rpc;
 };
 
 END_LAFRPC_NAMESPACE

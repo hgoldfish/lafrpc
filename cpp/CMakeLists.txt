@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
-project(laf_rpc)
+project(lafrpc)
 
 if(ANDROID)
     find_package(Qt5Core CONFIG REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
@@ -50,14 +50,14 @@ else()
     link_directories(${_qt5Core_install_prefix}/lib/)
 endif()
 
-add_library(laf_rpc STATIC ${LAFRPC_SRC} ${LAFRPC_INCLUDE})
-target_link_libraries(laf_rpc PUBLIC qtnetworkng)
-target_include_directories(laf_rpc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(lafrpc STATIC ${LAFRPC_SRC} ${LAFRPC_INCLUDE})
+target_link_libraries(lafrpc PUBLIC qtnetworkng)
+target_include_directories(lafrpc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(LAFRPC_BUILD_TESTS)
     add_executable(rpctest tests/simple_test.cpp)
-    target_link_libraries(rpctest Qt5::Core laf_rpc)
+    target_link_libraries(rpctest Qt5::Core lafrpc)
 
     add_executable(sendfiletest tests/sendfile.cpp)
-    target_link_libraries(sendfiletest PRIVATE Qt5::Core laf_rpc)
+    target_link_libraries(sendfiletest PRIVATE Qt5::Core lafrpc)
 endif()

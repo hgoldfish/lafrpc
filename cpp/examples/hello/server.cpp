@@ -1,7 +1,7 @@
 // server.cpp
-#include "laf_rpc.h"
+#include "lafrpc.h"
 
-using namespace laf_rpc;
+using namespace lafrpc;
 
 
 class Hello: public QObject
@@ -13,7 +13,7 @@ public slots:
 
 int main(int argc, char **argv)
 {
-    QSharedPointer<Rpc> rpc = Rpc::use("server", "msgpack");
+    QSharedPointer<Rpc> rpc = RpcBuilder(MessagePack).myPeerName("server").create();
     if(rpc.isNull()) {
         qDebug() << "can not create rpc server.";
         return 1;

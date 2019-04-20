@@ -14,29 +14,25 @@ class Crypto
 {
 public:
     virtual ~Crypto();
-    QByteArray genkey() {return genkey(DEFAULT_KEY_LENATH);}
-    virtual QByteArray genkey(int bytes);
-    virtual QByteArray encrypt(const QByteArray &data, const QByteArray &key) = 0;
-    virtual QByteArray decrypt(const QByteArray &data, const QByteArray &key) = 0;
+public:
+    virtual QByteArray encrypt(const QByteArray &data);
+    virtual QByteArray decrypt(const QByteArray &data);
 };
 
-
-class DummyCrypto: public Crypto
+class AES256CryptoPrivate;
+class AES256Crypto: public Crypto
 {
 public:
-    virtual QByteArray encrypt(const QByteArray &data, const QByteArray &key);
-    virtual QByteArray decrypt(const QByteArray &data, const QByteArray &key);
+    AES256Crypto(const QByteArray &key, const QByteArray &iv);
+    virtual ~AES256Crypto() override;
+public:
+    virtual QByteArray encrypt(const QByteArray &data) override;
+    virtual QByteArray decrypt(const QByteArray &data) override;
+private:
+    AES256CryptoPrivate *d_ptr;
+    Q_DECLARE_PRIVATE(AES256Crypto)
 };
 
-
-//class RsaCrypto: public Crypto
-//{
-//public:
-//    virtual QByteArray encrypt(const QByteArray &data, const QByteArray &key);
-//    virtual QByteArray decrypt(const QByteArray &data, const QByteArray &key);
-//    QByteArray sign(const QByteArray &data);
-//    QByteArray verify(const QByteArray &data, const QByteArray &hash);
-//};
 
 
 QByteArray urandom(int bytes);

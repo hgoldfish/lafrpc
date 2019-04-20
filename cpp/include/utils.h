@@ -9,7 +9,7 @@
 #include <QtCore/qvariant.h>
 
 #ifndef LAFRPC_NAMESPACE
-#define LAFRPC_NAMESPACE laf_rpc
+#define LAFRPC_NAMESPACE lafrpc
 #endif
 #define BEGIN_LAFRPC_NAMESPACE namespace LAFRPC_NAMESPACE {
 #define END_LAFRPC_NAMESPACE }

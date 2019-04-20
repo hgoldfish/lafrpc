@@ -9,10 +9,10 @@ SET(CMAKE_CXX_STANDARD 11)
 
 FIND_PACKAGE(Qt5Core REQUIRED)
 
-ADD_SUBDIRECTORY(../.. laf_rpc)
+ADD_SUBDIRECTORY(../.. lafrpc)
 
 ADD_EXECUTABLE(server server.cpp)
 ADD_EXECUTABLE(client client.cpp)
 
-TARGET_LINK_LIBRARIES(server Qt5::Core laf_rpc)
-TARGET_LINK_LIBRARIES(client Qt5::Core laf_rpc)
+TARGET_LINK_LIBRARIES(server Qt5::Core lafrpc)
+TARGET_LINK_LIBRARIES(client Qt5::Core lafrpc)

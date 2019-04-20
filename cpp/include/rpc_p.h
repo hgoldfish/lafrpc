@@ -13,13 +13,14 @@ struct PeerAndHeader
 
 class Transport;
 class TcpTransport;
-struct RpcPrivate
+class RpcPrivate
 {
 public:
-    RpcPrivate(const QString &myPeerName, const QSharedPointer<Serialization> &serialization, Rpc *parent);
+    RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *parent);
     ~RpcPrivate();
 
     bool setSslConfiguration(const qtng::SslConfiguration &config);
+    bool setHttpRootDir(const QDir &rootDir);
     QList<bool> startServers(const QStringList &addresses, bool blocking);
     QList<bool> stopServers(const QStringList &addresses);
     void shutdown();
@@ -40,12 +41,11 @@ public:
     float timeout;
     QMap<QString, QSharedPointer<Peer>> peers;
     QMap<QString, QSharedPointer<qtng::Event>> waiters;
-    QSharedPointer<AuthCallback> authCallback;
-    QSharedPointer<MakeKeyCallback> makeKeyCallback;
     QSharedPointer<HeaderCallback> headerCallback;
     QSharedPointer<LoggingCallback> loggingCallback;
     QSharedPointer<Serialization> serialization;
     QSharedPointer<Crypto> crypto;
+    QSharedPointer<MagicCodeManager> magicCodeManager;
     QList<QSharedPointer<Transport>> transports;
     QStringList serverAddressList;
     QMap<QString, QString> knownAddresses;
@@ -55,6 +55,7 @@ public:
 private:
     Rpc * const q_ptr;
     Q_DECLARE_PUBLIC(Rpc)
+    friend class RpcBuilder;
 
 };
 
