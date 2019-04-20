@@ -90,7 +90,7 @@ Then you have 3 files and a subdirectory:
         server.cpp
         client.cpp
         CMakeLists.txt
-        laf_rpc/
+        lafrpc/
 
 Build and test:
 
