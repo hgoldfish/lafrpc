@@ -13,9 +13,9 @@ Here comes an hello world example:
 The server source:
 
     // server.cpp
-    #include "laf_rpc.h"
+    #include "lafrpc.h"
 
-    using namespace laf_rpc;
+    using namespace lafrpc;
 
     class Hello: public QObject
     {
@@ -26,7 +26,7 @@ The server source:
 
     int main(int argc, char **argv)
     {
-        QSharedPointer<Rpc> rpc = Rpc::use("server", "msgpack");
+        QSharedPointer<Rpc> rpc = RpcBuilder(MessagePack).myPeerName("server").create();
         QSharedPointer<Hello> hello(new Hello());
         rpc->registerInstance(hello, "demo");
         rpc->startServer("tcp://127.0.0.1:8002");
@@ -38,13 +38,13 @@ The server source:
 The client source:
 
     // client.cpp
-    #include "laf_rpc.h"
+    #include "lafrpc.h"
 
-    using namespace laf_rpc;
+    using namespace lafrpc;
 
     int main(int argc, char **argv)
     {
-        QSharedPointer<Rpc> rpc = Rpc::use("client", "msgpack");
+        QSharedPointer<Rpc> rpc = RpcBuilder(MessagePack).myPeerName("client").create();
         QSharedPointer<Peer> peer = rpc->connect("tcp://127.0.0.1:8002");
         if (peer.isNull()) {
             qDebug() << "can not connect to peer.";
@@ -65,13 +65,13 @@ The cmake build file:
 
     FIND_PACKAGE(Qt5Core REQUIRED)
 
-    ADD_SUBDIRECTORY(laf_rpc/cpp/)
+    ADD_SUBDIRECTORY(lafrpc/cpp/ lafrpc)
 
     ADD_EXECUTABLE(server server.cpp)
     ADD_EXECUTABLE(client client.cpp)
 
-    TARGET_LINK_LIBRARIES(server Qt5::Core laf_rpc)
-    TARGET_LINK_LIBRARIES(client Qt5::Core laf_rpc)
+    TARGET_LINK_LIBRARIES(server Qt5::Core lafrpc)
+    TARGET_LINK_LIBRARIES(client Qt5::Core lafrpc)
 
 Now your project have 3 files:
 
@@ -82,7 +82,7 @@ Now your project have 3 files:
 
 Clone this project to project directory:
 
-    git clone --recursive https://github.com/hgoldfish/laf_rpc
+    git clone --recursive https://github.com/hgoldfish/lafrpc
 
 Then you have 3 files and a subdirectory:
 
