@@ -4,7 +4,6 @@
 #include "../include/base.h"
 #include "../include/peer.h"
 #include "../include/rpc_p.h"
-#include "../include/tran_crypto.h"
 #include "../include/serialization.h"
 
 static Q_LOGGING_CATEGORY(logger, "lafrpc.peer")
@@ -67,7 +66,7 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         request->args = l[3].toList();
         request->kwargs = l[4].toMap();
         request->header = l[5].toMap();
-        request->channel = l[6].toLongLong(&ok);
+        request->channel = static_cast<quint32>(l[6].toLongLong(&ok));
         request->rawSocket = l[7].toByteArray();
         if(ok) {
             return GOT_REQUEST;
@@ -81,7 +80,7 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         response->id = l[1].toByteArray();
         response->result = l[2];
         response->exception = l[3];
-        response->channel = l[4].toLongLong(&ok);
+        response->channel = static_cast<quint32>(l[4].toLongLong(&ok));
         response->rawSocket = l[5].toByteArray();
         if(ok) {
             return GOT_RESPONSE;
@@ -157,7 +156,7 @@ void PeerPrivate::shutdown()
     }
     waiters.clear();
     operations->killall();
-    channel->close();
+    channel->abort();
     QPointer<Peer> self(q);
     qtng::callInEventLoopAsync([self] {
         if (self.isNull()) {
@@ -247,10 +246,6 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     QByteArray requestBytes = packRequest(rpc.data()->serialization(), request);
     if(requestBytes.isEmpty()) {
         throw RpcSerializationException(QStringLiteral("can not serialize request while calling remote method: %1").arg(methodName));
-    }
-    requestBytes = rpc->crypto()->encrypt(requestBytes);
-    if(requestBytes.isEmpty()) {
-        throw RpcInternalException(QStringLiteral("can not encrypt data while calling remote method: %1").arg(methodName));
     }
     if(broken || rpc.isNull()) {
         throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
@@ -358,11 +353,6 @@ void PeerPrivate::handlePacket()
         }
 
         if(broken || rpc.isNull()) {
-            return shutdown();
-        }
-        packet = rpc.data()->crypto()->decrypt(packet);
-        if(packet.isEmpty()) {
-            qCDebug(logger) << "invalid packet.";
             return shutdown();
         }
 
@@ -555,14 +545,15 @@ QByteArray removeNamespace(const QByteArray &typeName)
     }
 }
 
-int metaTypeOf(const char *typeName)
+int metaTypeOf(const char *typeNameBytes)
 {
+    QByteArray typeName(typeNameBytes);
+    typeName.replace(' ', "");
     int type = QMetaType::type(typeName);
     if (type) {
         return type;
     }
-    QByteArray toFound(typeName);
-    removeNamespace(toFound);
+    removeNamespace(typeName);
 
     for (int i = QMetaType::User;; ++i) {
         const char *s = QMetaType::typeName(i);
@@ -573,8 +564,9 @@ int metaTypeOf(const char *typeName)
         if (tempName.isEmpty()) {
             return 0;
         }
+        typeName.replace(' ', "");
         tempName = removeNamespace(tempName);
-        if (toFound == tempName) {
+        if (typeName == tempName) {
             return i;
         }
     }
@@ -630,6 +622,7 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
                 throw RpcRemoteException(message);
             }
         } else {
+            // xxx for null shared_pointer
             void *obj = QMetaType::create(typeId);
             arg = QVariant(typeId, obj);
         }
@@ -639,11 +632,11 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
         parameters.append(QGenericArgument());
     }
 
-    int type = metaTypeOf(found.typeName());
-    if (!type) {
+    int rtype = metaTypeOf(found.typeName());
+    if (!rtype) {
         throw RpcRemoteException(QStringLiteral("unknown return type: %1").arg(found.typeName()));
     }
-    QVariant rvalue(type, QMetaType::create(type));
+    QVariant rvalue(rtype, QMetaType::create(rtype));
     QGenericReturnArgument rarg(found.typeName(), rvalue.data());
 
     found.invoke(obj, Qt::DirectConnection, rarg, parameters[0], parameters[1], parameters[2], parameters[3],

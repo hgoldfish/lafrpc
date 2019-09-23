@@ -41,7 +41,6 @@ enum SerializationType{
 
 class RpcPrivate;
 class Serialization;
-class Crypto;
 class RpcBuilder;
 class Rpc: public RegisterServiceMixin<QObject>
 {
@@ -54,9 +53,10 @@ signals:
 public:
     float timeout() const;
     void setTimeout(float timeout);
+    quint32 maxPacketSize() const;
+    void setMaxPacketSize(quint32 maxPacketSize);
     QString myPeerName() const;
     QSharedPointer<Serialization> serialization() const;
-    QSharedPointer<Crypto> crypto() const;
     QSharedPointer<MagicCodeManager> magicCodeManager() const;
     QSharedPointer<HeaderCallback> headerCallback() const;
     void setHeaderCallback(QSharedPointer<HeaderCallback> headerCallback);
@@ -102,8 +102,10 @@ public:
     RpcBuilder &loggingCallback(QSharedPointer<LoggingCallback> loggingCallback);
     RpcBuilder &magicCodeManager(QSharedPointer<MagicCodeManager> magicCodeManager);
     RpcBuilder &timeout(float timeout);
+    RpcBuilder &maxPacketSize(qint32 maxPacketSize);
     RpcBuilder &myPeerName(const QString &myPeerName);
     RpcBuilder &httpRootDir(const QDir &rootDir);
+
     QSharedPointer<Rpc> create();
 private:
     QSharedPointer<Rpc> rpc;

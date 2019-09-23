@@ -17,7 +17,6 @@ set(LAFRPC_SRC
     src/serialization.cpp
     src/base.cpp
     src/transport.cpp
-    src/tran_crypto.cpp
     src/sendfile.cpp
 )
 
@@ -29,7 +28,6 @@ set(LAFRPC_INCLUDE
     include/base.h
     include/transport.h
     include/rpc_p.h
-    include/tran_crypto.h
     include/sendfile.h
 )
 
@@ -41,14 +39,11 @@ endif()
 
 # Fix Qt-static cmake BUG
 # https://bugreports.qt.io/browse/QTBUG-38913
-if((EXISTS ${_qt5Core_install_prefix}/lib/libQt5Core.so) OR
-   (EXISTS ${_qt5Core_install_prefix}/lib64/libQt5Core.so) OR
-   (EXISTS ${_qt5Core_install_prefix}/bin/Qt5Core.dll))
-    message("Shared Qt is detected.")
-else()
+if(EXISTS ${_qt5Core_install_prefix}/lib/libQt5Core.a AND NOT EXISTS ${_qt5Core_install_prefix}/bin/Qt5Core.dll)
     message("Static Qt is detected.")
     link_directories(${_qt5Core_install_prefix}/lib/)
 endif()
+
 
 add_library(lafrpc STATIC ${LAFRPC_SRC} ${LAFRPC_INCLUDE})
 target_link_libraries(lafrpc PUBLIC qtnetworkng)

@@ -119,7 +119,7 @@ template<typename T>
 QString Serialization::registerClass()
 {
     const QString &lafrpcKey = Serializer<T>::lafrpcKey();
-    if(classes.contains(lafrpcKey)) {
+    if (classes.contains(lafrpcKey)) {
         return lafrpcKey;
     }
     SerializableInfo &info = classes[lafrpcKey];

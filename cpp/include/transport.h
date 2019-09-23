@@ -20,6 +20,7 @@ public:
     virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray *connectionId) = 0;
     virtual QSharedPointer<qtng::SocketLike> getRawSocket(const QByteArray &connectionId) = 0;
     virtual bool canHandle(const QString &address) = 0;
+    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel);
 protected:
     QPointer<Rpc> rpc;
 };
@@ -49,7 +50,6 @@ public:
 protected:
     void handleRequest(QSharedPointer<qtng::SocketLike> request);
     virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port);
-    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel);
     virtual QString getAddressTemplate();
 private:
     QMap<QByteArray, RawSocket> rawConnections;
@@ -67,7 +67,6 @@ public:
 protected:
     virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
     virtual bool canHandle(const QString &address) override;
-    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel) override;
     virtual QString getAddressTemplate() override;
 private:
     qtng::SslConfiguration config;
@@ -82,7 +81,6 @@ public:
 protected:
     virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
     virtual bool canHandle(const QString &address) override;
-    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel) override;
     virtual QString getAddressTemplate() override;
 };
 
@@ -97,7 +95,6 @@ public:
 protected:
     virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
     virtual bool canHandle(const QString &address) override;
-    virtual void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel) override;
     virtual QString getAddressTemplate() override;
 private:
     qtng::SslConfiguration config;
@@ -124,7 +121,7 @@ private:
     qtng::SslConfiguration config;
     qtng::HttpSession session;
     QDir rootDir;
-    friend class HasHttpTransport;
+//    friend class HasHttpTransport;
     friend class LafrpcHttpRequestHandler;
 };
 

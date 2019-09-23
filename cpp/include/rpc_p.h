@@ -39,12 +39,12 @@ public:
 public:
     QString myPeerName;
     float timeout;
+    quint32 maxPacketSize;
     QMap<QString, QSharedPointer<Peer>> peers;
     QMap<QString, QSharedPointer<qtng::Event>> waiters;
     QSharedPointer<HeaderCallback> headerCallback;
     QSharedPointer<LoggingCallback> loggingCallback;
     QSharedPointer<Serialization> serialization;
-    QSharedPointer<Crypto> crypto;
     QSharedPointer<MagicCodeManager> magicCodeManager;
     QList<QSharedPointer<Transport>> transports;
     QStringList serverAddressList;
