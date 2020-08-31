@@ -5,7 +5,8 @@
 #include "include/peer.h"
 #include "include/rpc.h"
 #include "include/serialization.h"
-#include "include/sendfile.h"
 #include "include/transport.h"
+#include "include/sendfile.h"
+#include "include/senddir.h"
 
 #endif

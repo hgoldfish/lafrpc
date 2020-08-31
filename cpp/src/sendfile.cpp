@@ -74,6 +74,7 @@ bool RpcFilePrivate::sendfileViaChannel(QIODevice *f, RpcFile::ProgressCallback 
             }
         }
     }
+    q->channel->recvPacket();  // ensure all data sent.
     return true;
 }
 
@@ -160,6 +161,7 @@ bool RpcFilePrivate::sendfileViaRawSocket(QIODevice *f, RpcFile::ProgressCallbac
             }
         }
     }
+    q->rawSocket->recv(1);
     return true;
 }
 
@@ -218,10 +220,14 @@ RpcFile::RpcFile(const QString &filePath, bool withHash)
     Q_D(RpcFile);
     QFileInfo fileInfo(filePath);
     d->filePath = filePath;
-    d->name = fileInfo.baseName();
+    d->name = fileInfo.fileName();
     if (fileInfo.exists()) {
         d->size = static_cast<quint64>(fileInfo.size());
+#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
+        d->ctime = static_cast<quint64>(fileInfo.birthTime().toMSecsSinceEpoch());
+#else
         d->ctime = static_cast<quint64>(fileInfo.created().toMSecsSinceEpoch());
+#endif
         d->mtime = static_cast<quint64>(fileInfo.lastModified().toMSecsSinceEpoch());
         d->atime = static_cast<quint64>(fileInfo.lastRead().toMSecsSinceEpoch());
         if (withHash) {
@@ -229,6 +235,7 @@ RpcFile::RpcFile(const QString &filePath, bool withHash)
         }
     }
 }
+
 
 RpcFile::RpcFile()
     :d_ptr(new RpcFilePrivate(this))
@@ -242,21 +249,36 @@ RpcFile::~RpcFile()
 }
 
 
+static QByteArray calculateHash(const QString &filePath)
+{
+    QFile f(filePath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        return QByteArray();
+    }
+    QCryptographicHash hasher(QCryptographicHash::Sha256);
+    hasher.addData(&f);
+    return hasher.result();
+}
+
+
 bool RpcFile::calculateHash()
 {
     Q_D(RpcFile);
     if (d->filePath.isEmpty()) {
         return false;
     }
-    QFile f(d->filePath);
-    if (!f.open(QIODevice::ReadOnly)) {
+    QString filePath = d->filePath;
+    const QByteArray &hash = qtng::callInThread<QByteArray>([filePath] () -> QByteArray {
+        return LAFRPC_NAMESPACE::calculateHash(filePath);
+    });
+    if (hash.isEmpty()) {
         return false;
+    } else {
+        d->hash = hash;
+        return true;
     }
-    QCryptographicHash hasher(QCryptographicHash::Sha256);
-    hasher.addData(&f);
-    d->hash = hasher.result();
-    return true;
 }
+
 
 bool RpcFile::isValid() const
 {

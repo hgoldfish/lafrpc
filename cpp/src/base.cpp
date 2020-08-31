@@ -136,7 +136,8 @@ QString RpcSerializationException::what() const
 UseStream::~UseStream() {}
 
 
-void UseStream::init(const QPointer<Rpc> &rpc, QFlags<Place> place, const QSharedPointer<qtng::VirtualChannel> &channel, QSharedPointer<qtng::SocketLike> rawSocket)
+void UseStream::init(QPointer<Rpc> &rpc, QFlags<Place> place, QSharedPointer<qtng::VirtualChannel> &channel,
+                     QSharedPointer<qtng::SocketLike> rawSocket)
 {
     serialization = rpc->serialization();
     this->place = place;

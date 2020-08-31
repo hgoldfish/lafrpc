@@ -80,8 +80,6 @@ public:
     static const QString SpecialSidKey;
     static QMap<QString, SerializableInfo> classes;
 
-    template<typename T> static QString registerClass();
-    template<typename T> static void unregisterClass();
     virtual ~Serialization();
 public:
     virtual QByteArray pack(const QVariant &obj) = 0;
@@ -116,13 +114,14 @@ inline void registerUseStreamClass(T * = 0, typename std::enable_if<!(std::is_ba
 
 
 template<typename T>
-QString Serialization::registerClass()
+QString registerClass()
 {
     const QString &lafrpcKey = Serializer<T>::lafrpcKey();
-    if (classes.contains(lafrpcKey)) {
+    if (Serialization::classes.contains(lafrpcKey)) {
         return lafrpcKey;
     }
-    SerializableInfo &info = classes[lafrpcKey];
+    qRegisterMetaType<QSharedPointer<T>>();
+    SerializableInfo &info = Serialization::classes[lafrpcKey];
     info.serializer = QSharedPointer<Serializer<T>>::create();
     info.metaTypeId = qMetaTypeId<QSharedPointer<T>>();
     info.name = Serializer<T>::className();
@@ -133,10 +132,10 @@ QString Serialization::registerClass()
 
 
 template<typename T>
-void Serialization::unregisterClass()
+void unregisterClass()
 {
     const QString &lafrpcKey = Serializer<T>::lafrpcKey();
-    classes.remove(lafrpcKey);
+    Serialization::classes.remove(lafrpcKey);
 }
 
 

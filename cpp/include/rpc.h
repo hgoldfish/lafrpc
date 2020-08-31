@@ -25,10 +25,10 @@ struct LoggingCallback
 };
 
 
-struct MagicCodeManager
+struct KcpFilter
 {
-    virtual ~MagicCodeManager();
-    virtual QSharedPointer<qtng::BaseRequestHandler> create(const QByteArray &magicCode, QSharedPointer<qtng::SocketLike> request, qtng::BaseStreamServer *server);
+    virtual ~KcpFilter();
+    virtual bool filter(qtng::KcpSocket *socket, char *data, qint32 *len, QHostAddress *addr, quint16 *port) = 0;
 };
 
 
@@ -51,14 +51,12 @@ public:
 signals:
     void newPeer(QSharedPointer<Peer> peer);
 public:
-    float timeout() const;
-    void setTimeout(float timeout);
     quint32 maxPacketSize() const;
     void setMaxPacketSize(quint32 maxPacketSize);
     QString myPeerName() const;
     QSharedPointer<Serialization> serialization() const;
-    QSharedPointer<MagicCodeManager> magicCodeManager() const;
     QSharedPointer<HeaderCallback> headerCallback() const;
+    QSharedPointer<KcpFilter> kcpFilter() const;
     void setHeaderCallback(QSharedPointer<HeaderCallback> headerCallback);
 
     QList<bool> startServers(const QStringList &addresses, bool blocking = true);
@@ -68,9 +66,11 @@ public:
     void shutdown();
 
     QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray *connectionId);
-    QSharedPointer<qtng::SocketLike> getRawSocket(const QString &peerName, const QByteArray &connectionId);
+    QSharedPointer<qtng::SocketLike> takeRawSocket(const QString &peerName, const QByteArray &connectionId);
     QSharedPointer<Peer> connect(const QString &peerNameOrAddess);
     QSharedPointer<Peer> get(const QString &peerName) const;
+    QList<QSharedPointer<Peer>> getAll(const QString &peerName) const;
+    QStringList getAllPeerNames() const;
     QList<QSharedPointer<Peer>> getAllPeers() const;
 
     bool isConnected(const QString &peerName) const;
@@ -100,9 +100,8 @@ public:
     RpcBuilder &sslConfiguration(const qtng::SslConfiguration &sslConfiguration);
     RpcBuilder &headerCallback(QSharedPointer<HeaderCallback> headerCallback);
     RpcBuilder &loggingCallback(QSharedPointer<LoggingCallback> loggingCallback);
-    RpcBuilder &magicCodeManager(QSharedPointer<MagicCodeManager> magicCodeManager);
-    RpcBuilder &timeout(float timeout);
-    RpcBuilder &maxPacketSize(qint32 maxPacketSize);
+    RpcBuilder &kcpFilter(QSharedPointer<KcpFilter> kcpFilter);
+    RpcBuilder &maxPacketSize(quint32 maxPacketSize);
     RpcBuilder &myPeerName(const QString &myPeerName);
     RpcBuilder &httpRootDir(const QDir &rootDir);
 

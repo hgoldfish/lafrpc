@@ -3,9 +3,12 @@
 #include <QtCore/qloggingcategory.h>
 #include "../include/transport.h"
 #include "../include/rpc.h"
+#include "../include/rpc_p.h"
 #include "../include/peer.h"
 
 static Q_LOGGING_CATEGORY(logger, "logger.transport")
+
+using namespace qtng;
 
 BEGIN_LAFRPC_NAMESPACE
 
@@ -30,9 +33,6 @@ void Transport::setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPo
 {
     if (rpc.isNull()) {
         return;
-    }
-    if (channel.dynamicCast<qtng::SocketChannel>()) {
-        channel.dynamicCast<qtng::SocketChannel>()->setKeepaliveTimeout(rpc->timeout());
     }
     channel->setMaxPacketSize(rpc->maxPacketSize());
 
@@ -64,15 +64,31 @@ TcpTransport::~TcpTransport()
 bool TcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
 {
     QUrl u(address);
-    if (!u.isValid() || u.scheme() != "tcp" || u.port() <= 0) {
+    if (rpc.isNull() || !u.isValid() || u.scheme() != "tcp" || u.port() <= 0) {
         return false;
     }
-    *host = QHostAddress(u.host());
+    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    if (addresses.isEmpty()) {
+        return false;
+    }
+    *host = addresses.first();
+    if (host->isNull()) {
+        return false;
+    }
     *port = static_cast<quint16>(u.port());
-    if(host->isNull()) {
-        return false;
+    if (*host == QHostAddress(QHostAddress::AnyIPv4) || *host == QHostAddress(QHostAddress::Any)) {
+        *socket = qtng::asSocketLike(new Socket(Socket::IPv4Protocol));
+    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
+        *socket = qtng::asSocketLike(new Socket(Socket::IPv6Protocol));
+    } else {
+        bool isIPv4Address;
+        host->toIPv4Address(&isIPv4Address);
+        if (isIPv4Address) {
+            *socket = qtng::asSocketLike(new Socket(Socket::IPv4Protocol));
+        } else {
+            *socket = qtng::asSocketLike(new Socket(Socket::IPv6Protocol));
+        }
     }
-    *socket = qtng::SocketLike::rawSocket(new qtng::Socket);
     return true;
 }
 
@@ -83,27 +99,27 @@ bool TcpTransport::startServer(const QString &address)
     QHostAddress host;
     quint16 port;
     bool valid = makeSocket(address, &serverSocket, &host, &port);
-    if(!valid) {
+    if (!valid) {
         return false;
     }
 
     bool success;
     success = serverSocket->setOption(qtng::Socket::AddressReusable, true);
-    if(!success) {
+    if (!success) {
         qCDebug(logger) << "can not set address reusable option.";
         return false;
     }
     success = serverSocket->bind(host, port);
-    if(!success) {
+    if (!success) {
         qCDebug(logger) << "can not bind to" << host << port;
         return false;
     }
     success = serverSocket->listen(50);
-    if(!success) {
+    if (!success) {
         qCDebug(logger) << "can not listen.";
         return false;
     }
-    while(true) {
+    while (true) {
         QSharedPointer<qtng::SocketLike> request = serverSocket->accept();
         if (request.isNull()) {
             break;
@@ -119,13 +135,13 @@ bool TcpTransport::startServer(const QString &address)
 
 void TcpTransport::handleRequest(QSharedPointer<qtng::SocketLike> request)
 {
+    if (rpc.isNull()) {
+        qCDebug(logger) << "rpc is gone.";
+        return;
+    }
     request->setOption(qtng::Socket::LowDelayOption, true);
     const QByteArray header = request->recvall(2);
-    if(header == QByteArray("\x4e\x67")) {
-        if(rpc.isNull()) {
-            qCDebug(logger) << "rpc is gone.";
-            return;
-        }
+    if (header == QByteArray("\x4e\x67")) {
         QSharedPointer<qtng::DataChannel> channel(new qtng::SocketChannel(request, qtng::NegativePole));
         setupChannel(request, channel);
         QString address = getAddressTemplate();
@@ -138,24 +154,15 @@ void TcpTransport::handleRequest(QSharedPointer<qtng::SocketLike> request)
         address = address.arg(request->peerPort());
         qCDebug(logger) << "got request from:" << address;
         QSharedPointer<Peer> peer = rpc->preparePeer(channel, QString(), address);
-    } else if(header == QByteArray("\x33\x74")) {
+    } else if (header == QByteArray("\x33\x74")) {
         const QByteArray &connectionId = request->recvall(16);
-        if(request->sendall("\xf3\x97") != 2) {
+        if (request->sendall("\xf3\x97") != 2) {
             qCDebug(logger) << "handshaking is failed in server side.";
             return;
         }
         qCDebug(logger) << "got raw socket:" << connectionId;
         rawConnections.insert(connectionId, RawSocket(request, QDateTime::currentDateTime()));
     } else {
-        if (!rpc.isNull()) {
-            QSharedPointer<MagicCodeManager> magicCodeManager = rpc.data()->magicCodeManager();
-            if (magicCodeManager.isNull()) {
-                qCDebug(logger) << "invalid incoming request, does not match magic number." << header;
-            } else {
-                QSharedPointer<qtng::BaseRequestHandler> handler = magicCodeManager->create(header, request, nullptr);
-                handler->run();
-            }
-        }
     }
 }
 
@@ -168,23 +175,23 @@ QString TcpTransport::getAddressTemplate()
 
 QSharedPointer<qtng::DataChannel> TcpTransport::connect(const QString &address, float timeout)
 {
-    if(timeout == 0.0f) {
+    if (timeout == 0.0f) {
         timeout = 5.0f;
     }
     QSharedPointer<qtng::SocketLike> request;
     QHostAddress host;
     quint16 port;
     bool valid = makeSocket(address, &request, &host, &port);
-    if(!valid) {
+    if (!valid) {
         return QSharedPointer<qtng::DataChannel>();
     }
     request->setOption(qtng::Socket::LowDelayOption, true);
     bool success = request->connect(host, port);
-    if(!success) {
+    if (!success) {
         return QSharedPointer<qtng::DataChannel>();
     }
     qint64 sentBytes = request->sendall("\x4e\x67");
-    if(sentBytes != 2) {
+    if (sentBytes != 2) {
         qCDebug(logger) << "handshaking is failed in client side.";
         return QSharedPointer<qtng::DataChannel>();
     }
@@ -200,7 +207,7 @@ QSharedPointer<qtng::SocketLike> TcpTransport::makeRawSocket(const QString &addr
     QHostAddress host;
     quint16 port;
     bool valid = makeSocket(address, &request, &host, &port);
-    if(!valid) {
+    if (!valid) {
         return QSharedPointer<qtng::SocketLike>();
     }
     *connectionId = randomBytes(16);
@@ -210,7 +217,7 @@ QSharedPointer<qtng::SocketLike> TcpTransport::makeRawSocket(const QString &addr
         return QSharedPointer<qtng::SocketLike>();
     }
     qint64 sentBytes = request->sendall(packet);
-    if(sentBytes != packet.size()) {
+    if (sentBytes != packet.size()) {
         return QSharedPointer<qtng::SocketLike>();
     }
     if (request->recvall(2) != "\xf3\x97") {
@@ -222,7 +229,7 @@ QSharedPointer<qtng::SocketLike> TcpTransport::makeRawSocket(const QString &addr
 }
 
 
-QSharedPointer<qtng::SocketLike> TcpTransport::getRawSocket(const QByteArray &connectionId)
+QSharedPointer<qtng::SocketLike> TcpTransport::takeRawSocket(const QByteArray &connectionId)
 {
     const RawSocket &rawConnection = rawConnections[connectionId];
     return rawConnection.connection;
@@ -238,15 +245,32 @@ bool TcpTransport::canHandle(const QString &address)
 bool SslTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
 {
     QUrl u(address);
-    if (!u.isValid() || u.scheme() != "ssl" || u.port() <= 0) {
+    if (rpc.isNull() || !u.isValid() || u.scheme() != "ssl" || u.port() <= 0) {
         return false;
     }
-    *host = QHostAddress(u.host());
+    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    if (addresses.isEmpty()) {
+        return false;
+    }
+    *host = addresses.first();
+    if (host->isNull()) {
+        return false;
+    }
     *port = static_cast<quint16>(u.port());
-    if(host->isNull()) {
-        return false;
+
+    if (*host == QHostAddress(QHostAddress::AnyIPv4) || *host == QHostAddress(QHostAddress::Any)) {
+        *socket = qtng::asSocketLike(new SslSocket(Socket::IPv4Protocol, config));
+    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
+        *socket = qtng::asSocketLike(new SslSocket(Socket::IPv6Protocol, config));
+    } else {
+        bool isIPv4Address;
+        host->toIPv4Address(&isIPv4Address);
+        if (isIPv4Address) {
+            *socket = qtng::asSocketLike(new SslSocket(Socket::IPv4Protocol, config));
+        } else {
+            *socket = qtng::asSocketLike(new SslSocket(Socket::IPv6Protocol, config));
+        }
     }
-    *socket = qtng::SocketLike::sslSocket(new qtng::SslSocket(qtng::Socket::AnyIPProtocol, config));
     return true;
 }
 
@@ -263,18 +287,61 @@ QString SslTransport::getAddressTemplate()
 }
 
 
+class KcpSocketWithFilter: public qtng::KcpSocket
+{
+public:
+    KcpSocketWithFilter(qtng::Socket::NetworkLayerProtocol protocol, QPointer<Rpc> rpc);
+    virtual bool filter(char *data, qint32 *len, QHostAddress *addr, quint16 *port) override;
+    QPointer<Rpc> rpc;
+};
+
+
+KcpSocketWithFilter::KcpSocketWithFilter(qtng::Socket::NetworkLayerProtocol protocol, QPointer<Rpc> rpc)
+    : qtng::KcpSocket(protocol)
+    , rpc(rpc) {}
+
+
+bool KcpSocketWithFilter::filter(char *data, qint32 *len, QHostAddress *addr, quint16 *port)
+{
+    if (rpc.isNull()) {
+        return false;
+    }
+    if (rpc->kcpFilter().isNull()) {
+        return false;
+    }
+    return rpc->kcpFilter()->filter(this, data, len, addr, port);
+}
+
+
 bool KcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
 {
     QUrl u(address);
-    if (!u.isValid() || u.scheme() != "kcp" || u.port() <= 0) {
+    if (rpc.isNull() || !u.isValid() || u.scheme() != "kcp" || u.port() <= 0) {
         return false;
     }
-    *host = QHostAddress(u.host());
+    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    if (addresses.isEmpty()) {
+        return false;
+    }
+    *host = addresses.first();
+    if (host->isNull()) {
+        return false;
+    }
     *port = static_cast<quint16>(u.port());
-    if(host->isNull()) {
-        return false;
+
+    if (*host == QHostAddress(QHostAddress::AnyIPv4) || *host == QHostAddress(QHostAddress::Any)) {
+        *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
+    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
+        *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+    } else {
+        bool isIPv4Address;
+        host->toIPv4Address(&isIPv4Address);
+        if (isIPv4Address) {
+            *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
+        } else {
+            *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+        }
     }
-    *socket = qtng::SocketLike::kcpSocket(new qtng::KcpSocket(qtng::Socket::AnyIPProtocol));
     return true;
 }
 
@@ -295,23 +362,41 @@ QString KcpTransport::getAddressTemplate()
 bool KcpSslTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
 {
     QUrl u(address);
-    if (!u.isValid() || u.scheme() != "kcp+ssl" || u.port() <= 0) {
+    if (rpc.isNull() || !u.isValid() || u.scheme() != "kcp+ssl" || u.port() <= 0) {
         return false;
     }
-    *host = QHostAddress(u.host());
+    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    if (addresses.isEmpty()) {
+        return false;
+    }
+    *host = addresses.first();
+    if (host->isNull()) {
+        return false;
+    }
     *port = static_cast<quint16>(u.port());
-    if(host->isNull()) {
-        return false;
+
+    QSharedPointer<qtng::SocketLike> kcp;
+    if (*host == QHostAddress(QHostAddress::AnyIPv4)  || *host == QHostAddress(QHostAddress::Any)) {
+        kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
+    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
+        kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+    } else {
+        bool isIPv4Address;
+        host->toIPv4Address(&isIPv4Address);
+        if (isIPv4Address) {
+            kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
+        } else {
+            kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+        }
     }
-    QSharedPointer<qtng::SocketLike> kcp = qtng::SocketLike::kcpSocket(new qtng::KcpSocket(qtng::Socket::AnyIPProtocol));
-    *socket = qtng::SocketLike::sslSocket(new qtng::SslSocket(kcp, config));
+    *socket = qtng::asSocketLike(new qtng::SslSocket(kcp, config));
     return true;
 }
 
 
 bool KcpSslTransport::canHandle(const QString &address)
 {
-    return address.startsWith("kcp+ssl://");
+    return address.startsWith("kcp+ssl://") || address.startsWith("ssl+kcp://");
 }
 
 
@@ -319,6 +404,7 @@ QString KcpSslTransport::getAddressTemplate()
 {
     return QStringLiteral("kcp+ssl://%1:%2");
 }
+
 
 struct LafrpcHttpData
 {
@@ -386,7 +472,7 @@ void LafrpcHttpRequestHandler::doPOST()
 
     const QByteArray &rpcHeader = request->recvall(2);
     if(rpcHeader == QByteArray("\x4e\x67")) {
-        if(rpc.isNull()) {
+        if (rpc.isNull()) {
             qCDebug(logger) << "rpc is gone.";
             return;
         }
@@ -412,7 +498,7 @@ void LafrpcHttpRequestHandler::doPOST()
         }
     } else if(rpcHeader == QByteArray("\x33\x74")) {
         const QByteArray &connectionId = request->recvall(16);
-        if(request->sendall("\xf3\x97") != 2) {
+        if (request->sendall("\xf3\x97") != 2) {
             qCDebug(logger) << "handshaking is failed in server side.";
             return;
         }
@@ -420,18 +506,9 @@ void LafrpcHttpRequestHandler::doPOST()
         transport->rawConnections.insert(connectionId, RawSocket(request, QDateTime::currentDateTime()));
         closeRequest = false;
     } else {
-        if (!rpc.isNull()) {
-            QSharedPointer<MagicCodeManager> magicCodeManager = rpc.data()->magicCodeManager();
-            if (magicCodeManager.isNull()) {
-                qCInfo(logger) << "invalid incoming request, does not match magic number." << rpcHeader;
-                return;
-            } else {
-                QSharedPointer<qtng::BaseRequestHandler> handler = magicCodeManager->create(rpcHeader, request, server);
-                handler->run();
-            }
-        }
     }
 }
+
 
 void LafrpcHttpRequestHandler::finish()
 {
@@ -486,19 +563,11 @@ QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool *done)
         *done = true;
         return QByteArray();
     } else {
-        if (!rpc.isNull()) {
-            QSharedPointer<MagicCodeManager> magicCodeManager = rpc.data()->magicCodeManager();
-            if (!magicCodeManager.isNull()) {
-                QSharedPointer<qtng::BaseRequestHandler> handler = magicCodeManager->create(rpcHeader, request, server);
-                handler->run();
-                *done = true;
-                return QByteArray();
-            }
-        }
+        *done = false;
+        return rpcHeader;
     }
-    *done = false;
-    return rpcHeader;
 }
+
 
 bool HttpTransport::startServer(const QString &address)
 {
@@ -561,6 +630,7 @@ QSharedPointer<qtng::SocketLike> httpConnect(qtng::HttpSession &session, const Q
     return stream;
 }
 
+
 QSharedPointer<qtng::DataChannel> HttpTransport::connect(const QString &address, float )
 {
     QSharedPointer<qtng::SocketLike> stream = httpConnect(session, address);
@@ -600,11 +670,13 @@ QSharedPointer<qtng::SocketLike> HttpTransport::makeRawSocket(const QString &add
     return stream;
 }
 
-QSharedPointer<qtng::SocketLike> HttpTransport::getRawSocket(const QByteArray &connectionId)
+
+QSharedPointer<qtng::SocketLike> HttpTransport::takeRawSocket(const QByteArray &connectionId)
 {
     const RawSocket &rawConnection = rawConnections[connectionId];
     return rawConnection.connection;
 }
+
 
 bool HttpTransport::canHandle(const QString &address)
 {
@@ -614,5 +686,6 @@ bool HttpTransport::canHandle(const QString &address)
         return false;
     }
 }
+
 
 END_LAFRPC_NAMESPACE

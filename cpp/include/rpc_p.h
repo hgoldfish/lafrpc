@@ -26,7 +26,7 @@ public:
     void shutdown();
     QSharedPointer<Peer> connect(const QString &peerName);
     QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray *connectionId);
-    QSharedPointer<qtng::SocketLike> getRawSocket(const QString &peerName, const QByteArray &connectionId);
+    QSharedPointer<qtng::SocketLike> takeRawSocket(const QString &peerName, const QByteArray &connectionId);
     bool isConnected(const QString &peerName) const;
     bool isConnecting(const QString &peerName) const;
     QVariantMap getRpcHeader();
@@ -35,28 +35,28 @@ public:
     inline QSharedPointer<Transport> findTransport(const QString &address);
     void setCurrentPeerAndHeader(const QPointer<Peer> &peer, const QVariantMap &header);
     void deleteCurrentPeerAndHeader();
-    void removePeer(const QString &peerName);
+    void removePeer(const QString &name, Peer *peer);
+
+    static inline RpcPrivate *getPrivateHelper(Rpc *rpc) { return rpc->d_func(); }
 public:
     QString myPeerName;
-    float timeout;
     quint32 maxPacketSize;
-    QMap<QString, QSharedPointer<Peer>> peers;
-    QMap<QString, QSharedPointer<qtng::Event>> waiters;
+    QMultiMap<QString, QSharedPointer<Peer>> peers;
     QSharedPointer<HeaderCallback> headerCallback;
     QSharedPointer<LoggingCallback> loggingCallback;
+    QSharedPointer<KcpFilter> kcpFilter;
     QSharedPointer<Serialization> serialization;
-    QSharedPointer<MagicCodeManager> magicCodeManager;
     QList<QSharedPointer<Transport>> transports;
     QStringList serverAddressList;
     QMap<QString, QString> knownAddresses;
     QMap<QString, QSharedPointer<qtng::Event>> connectingEvents;
     QMap<quintptr, PeerAndHeader> localStore;
     qtng::CoroutineGroup *operations;
+    QSharedPointer<qtng::SocketDnsCache> dnsCache;
 private:
     Rpc * const q_ptr;
     Q_DECLARE_PUBLIC(Rpc)
     friend class RpcBuilder;
-
 };
 
 END_LAFRPC_NAMESPACE

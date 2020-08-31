@@ -128,7 +128,8 @@ struct UseStream
 
     virtual ~UseStream();
 
-    void init(const QPointer<Rpc> &rpc, QFlags<Place> place, const QSharedPointer<qtng::VirtualChannel> &channel, QSharedPointer<qtng::SocketLike> rawSocket);
+    void init(QPointer<Rpc> &rpc, QFlags<Place> place, QSharedPointer<qtng::VirtualChannel> &channel,
+              QSharedPointer<qtng::SocketLike> rawSocket);
 
     void setReady()
     {

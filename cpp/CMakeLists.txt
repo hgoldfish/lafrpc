@@ -2,11 +2,13 @@ cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
 project(lafrpc)
 
-if(ANDROID)
-    find_package(Qt5Core CONFIG REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../qtnetworkng/qtnetworkng.h")
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../qtnetworkng/" qtnetworkng)
 else()
-    find_package(Qt5Core REQUIRED)
+    add_subdirectory(qtnetworkng)
 endif()
+
+find_package(Qt5Core CONFIG REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
 
 option(LAFRPC_BUILD_TESTS OFF)
 set(CMAKE_AUTOMOC ON)
@@ -18,6 +20,7 @@ set(LAFRPC_SRC
     src/base.cpp
     src/transport.cpp
     src/sendfile.cpp
+    src/senddir.cpp
 )
 
 set(LAFRPC_INCLUDE
@@ -29,13 +32,8 @@ set(LAFRPC_INCLUDE
     include/transport.h
     include/rpc_p.h
     include/sendfile.h
+    include/senddir.h
 )
-
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    add_subdirectory(../../qtnetworkng/ qtnetworkng)
-else()
-    add_subdirectory(qtnetworkng)
-endif()
 
 # Fix Qt-static cmake BUG
 # https://bugreports.qt.io/browse/QTBUG-38913

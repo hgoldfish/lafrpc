@@ -4,30 +4,26 @@
 #include "../include/transport.h"
 #include "../include/peer.h"
 #include "../include/sendfile.h"
+#include "../include/senddir.h"
 
 static Q_LOGGING_CATEGORY(logger, "lafrpc.rpc")
 
 #define PEER_VERSION 1
 #define KEY_SIZE 64
-// #define DEUBG_RPC_PROTOCOL
+//#define DEUBG_RPC_PROTOCOL
 
 BEGIN_LAFRPC_NAMESPACE
 
 HeaderCallback::~HeaderCallback() {}
 LoggingCallback::~LoggingCallback() {}
-MagicCodeManager::~MagicCodeManager() {}
+KcpFilter::~KcpFilter() {}
 
-
-QSharedPointer<qtng::BaseRequestHandler> MagicCodeManager::create(const QByteArray &, QSharedPointer<qtng::SocketLike>, qtng::BaseStreamServer *)
-{
-    return QSharedPointer<qtng::BaseRequestHandler>();
-}
 
 RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *parent)
-    : timeout(10.0)
-    , maxPacketSize(1024 * 1024 * 1024)
+    : maxPacketSize(1024 * 1024 * 1024)
     , serialization(serialization)
     , operations(new qtng::CoroutineGroup)
+    , dnsCache(new qtng::SocketDnsCache())
     , q_ptr(parent)
 {
     myPeerName = createUuidAsString();
@@ -39,8 +35,9 @@ RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *
     transports.append(QSharedPointer<Transport>(new HttpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new KcpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new KcpSslTransport(parent)));
-    Serialization::registerClass<RpcRemoteException>();
-    Serialization::registerClass<RpcFile>();
+    registerClass<RpcRemoteException>();
+    registerClass<RpcFile>();
+    registerClass<RpcDir>();
 }
 
 
@@ -86,6 +83,7 @@ bool RpcPrivate::setHttpRootDir(const QDir &rootDir)
     return false;
 }
 
+
 inline QSharedPointer<Transport> RpcPrivate::findTransport(const QString &address)
 {
     for (QSharedPointer<Transport> transport: transports) {
@@ -108,24 +106,26 @@ QList<bool> RpcPrivate::startServers(const QStringList &addresses, bool blocking
     QList<bool> result;
     QList<QSharedPointer<qtng::Coroutine>> coroutines;
     for (QString address: addresses) {
-        if(serverAddressList.contains(address)) {
-            result.append(true);
-            continue;
-        }
-        QSharedPointer<Transport> transport = findTransport(address);
-        if(transport.isNull()) {
-            qCWarning(logger) << "rpc does not support transport for" << address;
-            result.append(false);
-        }
         const QString &workerName = makeWorkerName(address);
-        QSharedPointer<qtng::Coroutine> coroutine = operations->spawnWithName(workerName, [transport, address] {
-            transport->startServer(address);
-        });
-        coroutines.append(coroutine);
-        serverAddressList.append(address);
-        result.append(true);
+        if (serverAddressList.contains(address) && operations->has(workerName)) {
+            result.append(true);
+            coroutines.append(operations->get(workerName));
+        } else {
+            QSharedPointer<Transport> transport = findTransport(address);
+            if (transport.isNull()) {
+                qCWarning(logger) << "rpc does not support transport for" << address;
+                result.append(false);
+            } else {
+                QSharedPointer<qtng::Coroutine> coroutine = operations->spawnWithName(workerName, [transport, address] {
+                    transport->startServer(address);
+                });
+                coroutines.append(coroutine);
+                serverAddressList.append(address);
+                result.append(true);
+            }
+        }
     }
-    if(blocking) {
+    if (blocking) {
         for (QSharedPointer<qtng::Coroutine> coroutine: coroutines) {
             coroutine->join();
         }
@@ -133,12 +133,13 @@ QList<bool> RpcPrivate::startServers(const QStringList &addresses, bool blocking
     return result;
 }
 
+
 QList<bool> RpcPrivate::stopServers(const QStringList &addresses)
 {
     QList<QString> serverAddressList;
     QList<bool> result;
 
-    if(addresses.isEmpty()) {
+    if (addresses.isEmpty()) {
         serverAddressList = this->serverAddressList;
     } else {
         serverAddressList = addresses;
@@ -162,6 +163,7 @@ void RpcPrivate::shutdown()
     peers.clear();
     operations->killall();
 }
+
 
 QSharedPointer<Peer> RpcPrivate::connect(const QString &peerName)
 {
@@ -215,7 +217,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerName)
     try {
         QSharedPointer<qtng::DataChannel> channel = transport->connect(peerAddress);
         QSharedPointer<Peer> peer;
-        if(channel.isNull()) {
+        if (channel.isNull()) {
 #ifdef DEUBG_RPC_PROTOCOL
             qCDebug(logger) << "Rpc::connect() -> can not connect to" << peerAddress;
 #endif
@@ -239,7 +241,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerName)
 QSharedPointer<qtng::SocketLike> RpcPrivate::makeRawSocket(const QString &peerName, QByteArray *connectionId)
 {
     const QString &address = knownAddresses.value(peerName);
-    if(address.isEmpty()) {
+    if (address.isEmpty()) {
 #ifdef DEUBG_RPC_PROTOCOL
         qCDebug(logger) << QStringLiteral("the address of %1 is not known.").arg(peerName);
 #endif
@@ -247,7 +249,7 @@ QSharedPointer<qtng::SocketLike> RpcPrivate::makeRawSocket(const QString &peerNa
     }
 
     QSharedPointer<Transport> transport = findTransport(address);
-    if(transport.isNull()) {
+    if (transport.isNull()) {
 #ifdef DEUBG_RPC_PROTOCOL
         qCDebug(logger) << "address is not supported." << address;
 #endif
@@ -258,11 +260,11 @@ QSharedPointer<qtng::SocketLike> RpcPrivate::makeRawSocket(const QString &peerNa
 }
 
 
-QSharedPointer<qtng::SocketLike> RpcPrivate::getRawSocket(const QString &peerName, const QByteArray &connectionId)
+QSharedPointer<qtng::SocketLike> RpcPrivate::takeRawSocket(const QString &peerName, const QByteArray &connectionId)
 {
     Q_UNUSED(peerName);
     for (QSharedPointer<Transport> transport: transports) {
-        QSharedPointer<qtng::SocketLike> rawSocket = transport->getRawSocket(connectionId);
+        QSharedPointer<qtng::SocketLike> rawSocket = transport->takeRawSocket(connectionId);
         if (!rawSocket.isNull()) {
             return rawSocket;
         }
@@ -286,7 +288,7 @@ bool RpcPrivate::isConnecting(const QString &peerAddress) const
 QVariantMap RpcPrivate::getRpcHeader()
 {
     quintptr coroutineId = qtng::Coroutine::current()->id();
-    if(!localStore.contains(coroutineId)) {
+    if (!localStore.contains(coroutineId)) {
         return QVariantMap();
     }
     const PeerAndHeader &t = localStore[qtng::Coroutine::current()->id()];
@@ -297,7 +299,7 @@ QVariantMap RpcPrivate::getRpcHeader()
 QPointer<Peer> RpcPrivate::getCurrentPeer()
 {
     quintptr coroutineId = qtng::Coroutine::current()->id();
-    if(!localStore.contains(coroutineId)) {
+    if (!localStore.contains(coroutineId)) {
         return QPointer<Peer>();
     }
     const PeerAndHeader &t = localStore[coroutineId];
@@ -321,18 +323,12 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
 #ifdef DEUBG_RPC_PROTOCOL
     qCDebug(logger) << "Rpc::preparePeer() -> my header." << myHeader;
 #endif
-    bool success = channel->sendPacket(data);
-    if(!success) {
-#ifdef DEUBG_RPC_PROTOCOL
-        qCInfo(logger, "Rpc::preparePeer() -> can not send header.");
-#endif
-        return empty;
-    }
+    channel->sendPacketAsync(data);
 #ifdef DEUBG_RPC_PROTOCOL
     qCDebug(logger) << "Rpc::preparePeer() -> receiving its header.";
 #endif
     QByteArray packet = channel->recvPacket();
-    if(packet.isNull()) {
+    if (packet.isNull()) {
 #ifdef DEUBG_RPC_PROTOCOL
         qCInfo(logger) << "Rpc::preparePeer() -> can not receive header.";
 #endif
@@ -340,7 +336,7 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
     }
 
     QVariantMap itsHeader = serialization->unpack(packet).toMap();
-    if(itsHeader.isEmpty()) {
+    if (itsHeader.isEmpty()) {
 #ifdef DEUBG_RPC_PROTOCOL
         qCInfo(logger) << "Rpc::preparePeer() -> can not deserialize header.";
 #endif
@@ -352,7 +348,7 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
 #endif
     const QString itsPeerName = itsHeader.value("peer_name").toString();
 
-    if(!peerName.isEmpty() && peerName != itsPeerName) {
+    if (!peerName.isEmpty() && peerName != itsPeerName) {
         qCInfo(logger) << QStringLiteral("Rpc::preparePeer() -> peer %1 return mismatched peer_name: %2").arg(peerName).arg(itsPeerName);
         return empty;
     }
@@ -362,97 +358,12 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
         return empty;
     }
 
-    // only keep a channel between two peers.
-    if(myPeerName > itsPeerName) {
-#ifdef DEUBG_RPC_PROTOCOL
-        qCDebug(logger) << "Rpc::preparePeer() -> I am larger.";
-#endif
-        if(peers.contains(itsPeerName)) {
-            QWeakPointer<Peer> t = peers.value(itsPeerName);
-            if(!t.isNull()) {
-#ifdef DEUBG_RPC_PROTOCOL
-                qCInfo(logger) << QString::fromUtf8("Rpc::preparePeer() -> %1 peer is already exists.").arg(itsPeerName);
-#endif
-                channel->sendPacket(QByteArray("haha"));
-                channel->abort();
-                return t.toStrongRef();
-            }
-        }
-#ifdef DEUBG_RPC_PROTOCOL
-        qCDebug(logger) << "Rpc::preparePeer() -> sending gaga.";
-#endif
-        channel->sendPacketAsync(QByteArray("gaga"));
-    } else {
-#ifdef DEUBG_RPC_PROTOCOL
-        qCDebug(logger) << "I am smaller.";
-#endif
-        const QByteArray &flag = channel->recvPacket();
-        if(flag.isEmpty()) {
-#ifdef DEUBG_RPC_PROTOCOL
-            qCInfo(logger) << "Rpc::preparePeer() -> can not initialize peer.";
-#endif
-            return empty;
-        } else if(flag == QByteArray("gaga")) {
-            // pass
-        } else if(flag == QByteArray("haha")) {
-#ifdef DEUBG_RPC_PROTOCOL
-            qCDebug(logger) << "Rpc::preparePeer() -> the other peer decide to close this channel.";
-#endif
-            channel->abort();
-            QWeakPointer<Peer> t = peers.value(itsPeerName);
-            if(!t.isNull()) {
-#ifdef DEUBG_RPC_PROTOCOL
-                qCDebug(logger) << "Rpc::preparePeer() -> there is already a peer exists.";
-#endif
-                return t.toStrongRef();
-            } else {
-#ifdef DEUBG_RPC_PROTOCOL
-                qCDebug(logger) << "Rpc::preparePeer() -> waiting for another handshake.";
-#endif
-                QSharedPointer<qtng::Event> waiter(new qtng::Event());
-                waiters.insert(itsPeerName, waiter);
-                try {
-                    qtng::Timeout _(timeout);
-                    if(!waiter->wait()) {
-#ifdef DEUBG_RPC_PROTOCOL
-                        qCDebug(logger) << "Rpc::preparePeer() -> timeout to wait for another handshake.";
-#endif
-                        return empty;
-                    }
-                } catch (qtng::TimeoutException &) {
-#ifdef DEUBG_RPC_PROTOCOL
-                    qCDebug(logger) << "Rpc::preparePeer() -> timeout to wait for another handshake.";
-#endif
-                    return empty;
-                }
-                QSharedPointer<Peer> t = peers.value(itsPeerName);
-                if(t.isNull()) {
-#ifdef DEUBG_RPC_PROTOCOL
-                    qCDebug(logger) << "Rpc::preparePeer() -> waiter is triggered without peer.";
-#endif
-                }
-                return t;
-            }
-        } else {
-#ifdef DEUBG_RPC_PROTOCOL
-            qCDebug(logger) << "Rpc::preparePeer() -> can not initialize peer, receiving invalid packet.";
-#endif
-            return empty;
-        }
-    }
     QSharedPointer<Peer> peer(new Peer(itsPeerName, channel, q));
     peer->setServices(q->getServices());
-    if(!peerAddress.isEmpty()) {
+    if (!peerAddress.isEmpty()) {
         // XXX only update known addresses in connect() function.
 //        knownAddresses[itsPeerName] = peerAddress;
         peer->setAddress(peerAddress);
-    }
-    if(waiters.contains(itsPeerName)) {
-#ifdef DEUBG_RPC_PROTOCOL
-        qCDebug(logger) << "Rpc::preparePeer() -> some one waint for this handshake, wake it up.";
-#endif
-        QSharedPointer<qtng::Event> waiter = waiters.value(itsPeerName);
-        waiter->set();
     }
 
     const QByteArray &certPEM = channel->property("peer_certificate").toByteArray();
@@ -462,7 +373,7 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
         peer->setProperty("peer_certificate_hash", certHash);
     }
 
-    peers[itsPeerName] = peer;
+    peers.insertMulti(itsPeerName, peer);
     QPointer<Rpc> self(q);
     qtng::callInEventLoopAsync([peer, self] {
         if (self.isNull()) {
@@ -470,7 +381,7 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
         }
         emit self.data()->newPeer(peer);
     });
-//    emit q->newPeer(peer);
+//    emit q->newPeer(peer);  // do not make this.
 #ifdef DEUBG_RPC_PROTOCOL
     qCDebug(logger) << "Rpc::preparePeer() -> now the peer" << itsPeerName << "is ready to used.";
 #endif
@@ -494,9 +405,15 @@ void RpcPrivate::deleteCurrentPeerAndHeader()
 }
 
 
-void RpcPrivate::removePeer(const QString &peerName)
+void RpcPrivate::removePeer(const QString &name, Peer *peer)
 {
-    peers.remove(peerName);
+    const QList<QSharedPointer<Peer>> &l = peers.values(name);
+    for (QSharedPointer<Peer> p: l) {
+        if (p.data() == peer) {
+            peers.remove(name, p);
+            return;
+        }
+    }
 }
 
 
@@ -510,20 +427,6 @@ Rpc::~Rpc()
 {
     delete dd_ptr;
 }
-
-float Rpc::timeout() const
-{
-    Q_D(const Rpc);
-    return d->timeout;
-}
-
-
-void Rpc::setTimeout(float timeout)
-{
-    Q_D(Rpc);
-    d->timeout = timeout;
-}
-
 
 quint32 Rpc::maxPacketSize() const
 {
@@ -553,17 +456,17 @@ QSharedPointer<Serialization> Rpc::serialization() const
 }
 
 
-QSharedPointer<MagicCodeManager> Rpc::magicCodeManager() const
-{
-    Q_D(const Rpc);
-    return d->magicCodeManager;
-}
-
-
 QSharedPointer<HeaderCallback> Rpc::headerCallback() const
 {
     Q_D(const Rpc);
     return d->headerCallback;
+}
+
+
+QSharedPointer<KcpFilter> Rpc::kcpFilter() const
+{
+    Q_D(const Rpc);
+    return d->kcpFilter;
 }
 
 
@@ -622,10 +525,10 @@ QSharedPointer<qtng::SocketLike> Rpc::makeRawSocket(const QString &peerName, QBy
 }
 
 
-QSharedPointer<qtng::SocketLike> Rpc::getRawSocket(const QString &peerName, const QByteArray &connectionId)
+QSharedPointer<qtng::SocketLike> Rpc::takeRawSocket(const QString &peerName, const QByteArray &connectionId)
 {
     Q_D(Rpc);
-    return d->getRawSocket(peerName, connectionId);
+    return d->takeRawSocket(peerName, connectionId);
 }
 
 
@@ -649,10 +552,37 @@ bool Rpc::isConnecting(const QString &peerAddress) const
     return d->isConnecting(peerAddress);
 }
 
+
 QSharedPointer<Peer> Rpc::get(const QString &peerName) const
 {
     Q_D(const Rpc);
-    return d->peers.value(peerName);
+    for (QSharedPointer<Peer> peer: d->peers.values(peerName)) {
+        if (peer->isOk()) {
+            return peer;
+        }
+    }
+    return QSharedPointer<Peer>();
+}
+
+
+QList<QSharedPointer<Peer>> Rpc::getAll(const QString &peerName) const
+{
+    Q_D(const Rpc);
+    return d->peers.values(peerName);
+}
+
+
+QStringList Rpc::getAllPeerNames() const
+{
+    Q_D(const Rpc);
+    return d->peers.keys();
+}
+
+
+QList<QSharedPointer<Peer>> Rpc::getAllPeers() const
+{
+    Q_D(const Rpc);
+    return d->peers.values();
 }
 
 
@@ -667,13 +597,6 @@ void Rpc::setAddress(const QString &peerName, const QString &peerAddress)
 {
     Q_D(Rpc);
     d->knownAddresses.insert(peerName, peerAddress);
-}
-
-
-QList<QSharedPointer<Peer>> Rpc::getAllPeers() const
-{
-    Q_D(const Rpc);
-    return d->peers.values();
 }
 
 
@@ -703,10 +626,11 @@ RpcBuilder Rpc::builder(SerializationType serialization)
     return RpcBuilder(serialization);
 }
 
+
 RpcBuilder::RpcBuilder(SerializationType serialization)
 {
     QSharedPointer<Serialization> s;
-    switch(serialization) {
+    switch (serialization) {
     case Json:
         s.reset(new JsonSerialization());
         break;
@@ -748,24 +672,17 @@ RpcBuilder &RpcBuilder::loggingCallback(QSharedPointer<LoggingCallback> loggingC
     return *this;
 }
 
-RpcBuilder &RpcBuilder::magicCodeManager(QSharedPointer<MagicCodeManager> magicCodeManager)
-{
-    if (!rpc.isNull()) {
-        rpc->d_func()->magicCodeManager = magicCodeManager;
-    }
-    return *this;
-}
 
-RpcBuilder &RpcBuilder::timeout(float timeout)
+RpcBuilder &RpcBuilder::kcpFilter(QSharedPointer<KcpFilter> kcpFilter)
 {
     if (!rpc.isNull()) {
-        rpc->d_func()->timeout = timeout;
+        rpc->d_func()->kcpFilter = kcpFilter;
     }
     return *this;
 }
 
 
-RpcBuilder &RpcBuilder::maxPacketSize(qint32 maxPacketSize)
+RpcBuilder &RpcBuilder::maxPacketSize(quint32 maxPacketSize)
 {
     if (!rpc.isNull()) {
         rpc->d_func()->maxPacketSize = maxPacketSize;

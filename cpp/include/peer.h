@@ -58,7 +58,7 @@ public:
                   const QVariant &arg9);
 
     QSharedPointer<qtng::DataChannel> makeChannel();
-    QSharedPointer<qtng::DataChannel> getChannel(quint32 channelNumber);
+    QSharedPointer<qtng::DataChannel> takeChannel(quint32 channelNumber);
 signals:
     void disconnected(Peer *self);
 private:

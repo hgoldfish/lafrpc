@@ -1,6 +1,6 @@
 #include <QtCore/qmetaobject.h>
 #include <QtCore/qloggingcategory.h>
-#include "../qtnetworkng/qtnetworkng.h"
+#include "qtnetworkng.h"
 #include "../include/base.h"
 #include "../include/peer.h"
 #include "../include/rpc_p.h"
@@ -124,7 +124,7 @@ public:
 
 PeerPrivate::PeerPrivate(const QString &name, const QSharedPointer<qtng::DataChannel> &channel,
                                const QPointer<Rpc> &rpc,  Peer *parent)
-    :name(name)
+    : name(name)
     , channel(channel)
     , rpc(rpc)
     , operations(new qtng::CoroutineGroup())
@@ -145,6 +145,7 @@ PeerPrivate::~PeerPrivate()
 
 void PeerPrivate::shutdown()
 {
+    // THIS FUNC WOULD BE CALLED IN EVENTLOOP
     Q_Q(Peer);
     if(broken) {
         return;
@@ -163,8 +164,12 @@ void PeerPrivate::shutdown()
             return;
         }
         emit self->disconnected(self.data());
-        if (!self->d_func()->rpc.isNull()) {
-            self->d_func()->rpc->dd_ptr->removePeer(self->d_func()->name);
+        if (self.isNull()) {
+            return;
+        }
+        // xxx this statements shoud not place outside, because it delete this peer instantly.
+        if (!self.data()->d_func()->rpc.isNull()) {
+            self.data()->d_func()->rpc->d_func()->removePeer(self.data()->d_func()->name, self.data());
         }
     });
     // XXX do not do this.
@@ -270,13 +275,8 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
     QSharedPointer<Response> response;
     try {
-        qtng::Timeout _(rpc->timeout());
         response = waiter->wait();
         waiters.remove(request.id);
-    } catch (qtng::TimeoutException &) {
-        waiters.remove(request.id);
-        const QString &message = QStringLiteral("timeout calling remote method: `%1`").arg(methodName);
-        throw RpcRemoteException(message);
     } catch (qtng::CoroutineExitException &) {
         waiters.remove(request.id);
         throw;
@@ -310,7 +310,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
             qCWarning(logger) << "the response of" << methodName << "is a use-stream, but has no channel number.";
             throw RpcInternalException();
         }
-        QSharedPointer<qtng::VirtualChannel> subChannelFromServer = channel->getChannel(response->channel);
+        QSharedPointer<qtng::VirtualChannel> subChannelFromServer = channel->takeChannel(response->channel);
         if (subChannelFromServer.isNull()) {
             qCWarning(logger) << methodName << "returns a channel, but is gone.";
             throw RpcRemoteException();
@@ -320,7 +320,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
             if (!streamFromServer->preferRawSocket) {
                 qCWarning(logger) << "the response of" << methodName << "do not prefer raw socket, but got one.";
             }
-            rawSocket = rpc->getRawSocket(name, response->rawSocket);
+            rawSocket = rpc->takeRawSocket(name, response->rawSocket);
             if (rawSocket.isNull()) {
                 qCWarning(logger) << "the response of" << methodName << "returns a raw socket, but is gone:" << response->rawSocket;
             }
@@ -333,11 +333,11 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
 void PeerPrivate::handlePacket()
 {
-    if(broken || rpc.isNull()) {
+    if (broken || rpc.isNull()) {
         return;
     }
 
-    while(true) {
+    while (true) {
         QByteArray packet;
         try {
             packet = channel->recvPacket();
@@ -348,24 +348,25 @@ void PeerPrivate::handlePacket()
             return shutdown();
         }
 
-        if(packet.isEmpty()) {
+        if (packet.isEmpty()) {
+            qCDebug(logger) << "channel disconnected while receiving packet.";
             return shutdown();
         }
 
-        if(broken || rpc.isNull()) {
+        if (broken || rpc.isNull()) {
             return shutdown();
         }
 
         QSharedPointer<Request> request(new Request());
         QSharedPointer<Response> response(new Response());
         int what = unpackRequestOrResponse(rpc->serialization(), packet, request.data(), response.data());
-        if(what == GOT_REQUEST && request->isOk()) {
+        if (what == GOT_REQUEST && request->isOk()) {
             operations->spawn([this, request] {
                 handleRequest(request);
             });
-        } else if(what == GOT_RESPONSE && response->isOk()) {
+        } else if (what == GOT_RESPONSE && response->isOk()) {
             QSharedPointer<qtng::ValueEvent<QSharedPointer<Response>>> waiter = waiters.value(response->id);
-            if(waiter.isNull()) {
+            if (waiter.isNull()) {
                 qCDebug(logger) << "received a response from server, but waiter is gone: " << response->id;
             } else {
                 waiter->send(response);
@@ -380,17 +381,17 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 {
     Q_Q(Peer);
     bool success;
-    if(broken || rpc.isNull()) {
+    if (broken || rpc.isNull()) {
         return;
     }
-    if(!rpc->dd_ptr->headerCallback.isNull()) {
+    if (!rpc->dd_ptr->headerCallback.isNull()) {
         bool success = rpc->dd_ptr->headerCallback->auth(q, request->methodName, request->header);
-        if(!success) {
+        if (!success) {
             qCDebug(logger) << "invalid packet from" << name;
             return;
         }
     }
-    if(broken || rpc.isNull()) {
+    if (broken || rpc.isNull()) {
         return;
     }
 
@@ -419,7 +420,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
             QSharedPointer<RpcRemoteException> e(new RpcRemoteException("bad channel"));
             response.exception.setValue(e);
         } else {
-            QSharedPointer<qtng::VirtualChannel> subChannelFromClient = channel->getChannel(request->channel);
+            QSharedPointer<qtng::VirtualChannel> subChannelFromClient = channel->takeChannel(request->channel);
             if (subChannelFromClient.isNull()) {
                 qCWarning(logger) << "the request of" << request->methodName << "sent a channel, but it is gone.";
                 QSharedPointer<RpcRemoteException> e(new RpcRemoteException("bad channel"));
@@ -430,7 +431,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
                     if (!streamFromClient->preferRawSocket) {
                         qCWarning(logger) << request->methodName << "send an raw socket, but UseSteam do not prefer raw socket.";
                     }
-                    rawSocket =  rpc->getRawSocket(name, request->rawSocket);
+                    rawSocket = rpc->takeRawSocket(name, request->rawSocket);
                     if (rawSocket.isNull()) {
                         qCWarning(logger) << request->methodName << "sent an use-stream raw socket, but it is gone.";
                     }
@@ -455,7 +456,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
             QSharedPointer<RpcRemoteException> e(new RpcRemoteException("unknown exception caught."));
             response.exception.setValue(e);
         }
-        if(broken || rpc.isNull()) {
+        if (broken || rpc.isNull()) {
             return;
         }
     }
@@ -503,7 +504,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
     }
 
     success = channel->sendPacket(responseBytes);
-    if(!success || broken || rpc.isNull()) {
+    if (!success || broken || rpc.isNull()) {
         return;
     }
 
@@ -870,13 +871,13 @@ QSharedPointer<qtng::DataChannel> Peer::makeChannel()
     return d->channel->makeChannel();
 }
 
-QSharedPointer<qtng::DataChannel> Peer::getChannel(quint32 channelNumber)
+QSharedPointer<qtng::DataChannel> Peer::takeChannel(quint32 channelNumber)
 {
     Q_D(Peer);
     if (!isOk()) {
         return QSharedPointer<qtng::DataChannel>();
     }
-    return d->channel->getChannel(channelNumber);
+    return d->channel->takeChannel(channelNumber);
 
 }
 
