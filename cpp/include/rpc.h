@@ -28,7 +28,7 @@ struct LoggingCallback
 struct KcpFilter
 {
     virtual ~KcpFilter();
-    virtual bool filter(qtng::KcpSocket *socket, char *data, qint32 *len, QHostAddress *addr, quint16 *port) = 0;
+    virtual bool filter(qtng::KcpSocket *socket, char *data, qint32 *len, qtng::HostAddress *addr, quint16 *port) = 0;
 };
 
 

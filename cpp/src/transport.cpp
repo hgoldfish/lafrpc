@@ -61,13 +61,13 @@ TcpTransport::~TcpTransport()
 }
 
 
-bool TcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
+bool TcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, HostAddress *host, quint16 *port)
 {
     QUrl u(address);
     if (rpc.isNull() || !u.isValid() || u.scheme() != "tcp" || u.port() <= 0) {
         return false;
     }
-    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    const QList<HostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
     if (addresses.isEmpty()) {
         return false;
     }
@@ -76,17 +76,17 @@ bool TcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::Socke
         return false;
     }
     *port = static_cast<quint16>(u.port());
-    if (*host == QHostAddress(QHostAddress::AnyIPv4) || *host == QHostAddress(QHostAddress::Any)) {
-        *socket = qtng::asSocketLike(new Socket(Socket::IPv4Protocol));
-    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
-        *socket = qtng::asSocketLike(new Socket(Socket::IPv6Protocol));
+    if (*host == HostAddress(HostAddress::AnyIPv4) || *host == HostAddress(HostAddress::Any)) {
+        *socket = qtng::asSocketLike(new Socket(HostAddress::IPv4Protocol));
+    } else if (*host == HostAddress(HostAddress::AnyIPv6)) {
+        *socket = qtng::asSocketLike(new Socket(HostAddress::IPv6Protocol));
     } else {
         bool isIPv4Address;
         host->toIPv4Address(&isIPv4Address);
         if (isIPv4Address) {
-            *socket = qtng::asSocketLike(new Socket(Socket::IPv4Protocol));
+            *socket = qtng::asSocketLike(new Socket(HostAddress::IPv4Protocol));
         } else {
-            *socket = qtng::asSocketLike(new Socket(Socket::IPv6Protocol));
+            *socket = qtng::asSocketLike(new Socket(HostAddress::IPv6Protocol));
         }
     }
     return true;
@@ -96,7 +96,7 @@ bool TcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::Socke
 bool TcpTransport::startServer(const QString &address)
 {
     QSharedPointer<qtng::SocketLike> serverSocket;
-    QHostAddress host;
+    HostAddress host;
     quint16 port;
     bool valid = makeSocket(address, &serverSocket, &host, &port);
     if (!valid) {
@@ -145,8 +145,8 @@ void TcpTransport::handleRequest(QSharedPointer<qtng::SocketLike> request)
         QSharedPointer<qtng::DataChannel> channel(new qtng::SocketChannel(request, qtng::NegativePole));
         setupChannel(request, channel);
         QString address = getAddressTemplate();
-        const QHostAddress peerAddress = request->peerAddress();
-        if (peerAddress.protocol() == QAbstractSocket::IPv6Protocol) {
+        const HostAddress &peerAddress = request->peerAddress();
+        if (peerAddress.protocol() == HostAddress::IPv6Protocol) {
             address = address.arg(QStringLiteral("[%1]").arg(peerAddress.toString()));
         } else {
             address = address.arg(peerAddress.toString());
@@ -179,7 +179,7 @@ QSharedPointer<qtng::DataChannel> TcpTransport::connect(const QString &address, 
         timeout = 5.0f;
     }
     QSharedPointer<qtng::SocketLike> request;
-    QHostAddress host;
+    HostAddress host;
     quint16 port;
     bool valid = makeSocket(address, &request, &host, &port);
     if (!valid) {
@@ -204,7 +204,7 @@ QSharedPointer<qtng::DataChannel> TcpTransport::connect(const QString &address, 
 QSharedPointer<qtng::SocketLike> TcpTransport::makeRawSocket(const QString &address, QByteArray *connectionId)
 {
     QSharedPointer<qtng::SocketLike> request;
-    QHostAddress host;
+    HostAddress host;
     quint16 port;
     bool valid = makeSocket(address, &request, &host, &port);
     if (!valid) {
@@ -242,13 +242,13 @@ bool TcpTransport::canHandle(const QString &address)
 }
 
 
-bool SslTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
+bool SslTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, HostAddress *host, quint16 *port)
 {
     QUrl u(address);
     if (rpc.isNull() || !u.isValid() || u.scheme() != "ssl" || u.port() <= 0) {
         return false;
     }
-    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    const QList<HostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
     if (addresses.isEmpty()) {
         return false;
     }
@@ -258,17 +258,17 @@ bool SslTransport::makeSocket(const QString &address, QSharedPointer<qtng::Socke
     }
     *port = static_cast<quint16>(u.port());
 
-    if (*host == QHostAddress(QHostAddress::AnyIPv4) || *host == QHostAddress(QHostAddress::Any)) {
-        *socket = qtng::asSocketLike(new SslSocket(Socket::IPv4Protocol, config));
-    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
-        *socket = qtng::asSocketLike(new SslSocket(Socket::IPv6Protocol, config));
+    if (*host == HostAddress(HostAddress::AnyIPv4) || *host == HostAddress(HostAddress::Any)) {
+        *socket = qtng::asSocketLike(new SslSocket(HostAddress::IPv4Protocol, config));
+    } else if (*host == HostAddress(HostAddress::AnyIPv6)) {
+        *socket = qtng::asSocketLike(new SslSocket(HostAddress::IPv6Protocol, config));
     } else {
         bool isIPv4Address;
         host->toIPv4Address(&isIPv4Address);
         if (isIPv4Address) {
-            *socket = qtng::asSocketLike(new SslSocket(Socket::IPv4Protocol, config));
+            *socket = qtng::asSocketLike(new SslSocket(HostAddress::IPv4Protocol, config));
         } else {
-            *socket = qtng::asSocketLike(new SslSocket(Socket::IPv6Protocol, config));
+            *socket = qtng::asSocketLike(new SslSocket(HostAddress::IPv6Protocol, config));
         }
     }
     return true;
@@ -290,18 +290,18 @@ QString SslTransport::getAddressTemplate()
 class KcpSocketWithFilter: public qtng::KcpSocket
 {
 public:
-    KcpSocketWithFilter(qtng::Socket::NetworkLayerProtocol protocol, QPointer<Rpc> rpc);
-    virtual bool filter(char *data, qint32 *len, QHostAddress *addr, quint16 *port) override;
+    KcpSocketWithFilter(qtng::HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc);
+    virtual bool filter(char *data, qint32 *len, HostAddress *addr, quint16 *port) override;
     QPointer<Rpc> rpc;
 };
 
 
-KcpSocketWithFilter::KcpSocketWithFilter(qtng::Socket::NetworkLayerProtocol protocol, QPointer<Rpc> rpc)
+KcpSocketWithFilter::KcpSocketWithFilter(qtng::HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc)
     : qtng::KcpSocket(protocol)
     , rpc(rpc) {}
 
 
-bool KcpSocketWithFilter::filter(char *data, qint32 *len, QHostAddress *addr, quint16 *port)
+bool KcpSocketWithFilter::filter(char *data, qint32 *len, HostAddress *addr, quint16 *port)
 {
     if (rpc.isNull()) {
         return false;
@@ -313,13 +313,13 @@ bool KcpSocketWithFilter::filter(char *data, qint32 *len, QHostAddress *addr, qu
 }
 
 
-bool KcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
+bool KcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, HostAddress *host, quint16 *port)
 {
     QUrl u(address);
     if (rpc.isNull() || !u.isValid() || u.scheme() != "kcp" || u.port() <= 0) {
         return false;
     }
-    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    const QList<HostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
     if (addresses.isEmpty()) {
         return false;
     }
@@ -329,17 +329,17 @@ bool KcpTransport::makeSocket(const QString &address, QSharedPointer<qtng::Socke
     }
     *port = static_cast<quint16>(u.port());
 
-    if (*host == QHostAddress(QHostAddress::AnyIPv4) || *host == QHostAddress(QHostAddress::Any)) {
-        *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
-    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
-        *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+    if (*host == HostAddress(HostAddress::AnyIPv4) || *host == HostAddress(HostAddress::Any)) {
+        *socket = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv4Protocol, rpc));
+    } else if (*host == HostAddress(HostAddress::AnyIPv6)) {
+        *socket = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv6Protocol, rpc));
     } else {
         bool isIPv4Address;
         host->toIPv4Address(&isIPv4Address);
         if (isIPv4Address) {
-            *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
+            *socket = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv4Protocol, rpc));
         } else {
-            *socket = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+            *socket = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv6Protocol, rpc));
         }
     }
     return true;
@@ -359,13 +359,13 @@ QString KcpTransport::getAddressTemplate()
 
 
 
-bool KcpSslTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port)
+bool KcpSslTransport::makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, HostAddress *host, quint16 *port)
 {
     QUrl u(address);
     if (rpc.isNull() || !u.isValid() || u.scheme() != "kcp+ssl" || u.port() <= 0) {
         return false;
     }
-    const QList<QHostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
+    const QList<HostAddress> &addresses = RpcPrivate::getPrivateHelper(rpc)->dnsCache->resolve(u.host());
     if (addresses.isEmpty()) {
         return false;
     }
@@ -376,17 +376,17 @@ bool KcpSslTransport::makeSocket(const QString &address, QSharedPointer<qtng::So
     *port = static_cast<quint16>(u.port());
 
     QSharedPointer<qtng::SocketLike> kcp;
-    if (*host == QHostAddress(QHostAddress::AnyIPv4)  || *host == QHostAddress(QHostAddress::Any)) {
-        kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
-    } else if (*host == QHostAddress(QHostAddress::AnyIPv6)) {
-        kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+    if (*host == HostAddress(HostAddress::AnyIPv4)  || *host == HostAddress(HostAddress::Any)) {
+        kcp = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv4Protocol, rpc));
+    } else if (*host == HostAddress(HostAddress::AnyIPv6)) {
+        kcp = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv6Protocol, rpc));
     } else {
         bool isIPv4Address;
         host->toIPv4Address(&isIPv4Address);
         if (isIPv4Address) {
-            kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv4Protocol, rpc));
+            kcp = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv4Protocol, rpc));
         } else {
-            kcp = qtng::asSocketLike(new KcpSocketWithFilter(Socket::IPv6Protocol, rpc));
+            kcp = qtng::asSocketLike(new KcpSocketWithFilter(HostAddress::IPv6Protocol, rpc));
         }
     }
     *socket = qtng::asSocketLike(new qtng::SslSocket(kcp, config));
@@ -484,8 +484,8 @@ void LafrpcHttpRequestHandler::doPOST()
         } else {
             address = QStringLiteral("http://%1:%2");
         }
-        const QHostAddress peerAddress = request->peerAddress();
-        if (peerAddress.protocol() == QAbstractSocket::IPv6Protocol) {
+        const HostAddress &peerAddress = request->peerAddress();
+        if (peerAddress.protocol() == HostAddress::IPv6Protocol) {
             address = address.arg(QStringLiteral("[%1]").arg(peerAddress.toString()));
         } else {
             address = address.arg(peerAddress.toString());
@@ -537,8 +537,8 @@ QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool *done)
         } else {
             address = QStringLiteral("http://%1:%2");
         }
-        const QHostAddress peerAddress = request->peerAddress();
-        if (peerAddress.protocol() == QAbstractSocket::IPv6Protocol) {
+        const HostAddress &peerAddress = request->peerAddress();
+        if (peerAddress.protocol() == HostAddress::IPv6Protocol) {
             address = address.arg(QStringLiteral("[%1]").arg(peerAddress.toString()));
         } else {
             address = address.arg(peerAddress.toString());
@@ -577,7 +577,7 @@ bool HttpTransport::startServer(const QString &address)
     }
     quint16 port;
     QSharedPointer<qtng::BaseStreamServer> server;
-    QHostAddress host = QHostAddress(u.host());
+    HostAddress host = HostAddress(u.host());
     QString rpcPath = u.path();
     if (rpcPath.isEmpty()) {
         rpcPath = "/";

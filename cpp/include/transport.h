@@ -49,7 +49,7 @@ public:
     virtual bool canHandle(const QString &address) override;
 protected:
     void handleRequest(QSharedPointer<qtng::SocketLike> request);
-    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port);
+    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, qtng::HostAddress *host, quint16 *port);
     virtual QString getAddressTemplate();
 private:
     QMap<QByteArray, RawSocket> rawConnections;
@@ -65,7 +65,7 @@ public:
 public:
     void setSslConfiguration(const qtng::SslConfiguration &config) {this->config = config; }
 protected:
-    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
+    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, qtng::HostAddress *host, quint16 *port) override;
     virtual bool canHandle(const QString &address) override;
     virtual QString getAddressTemplate() override;
 private:
@@ -79,7 +79,7 @@ public:
     explicit KcpTransport(QPointer<Rpc> rpc)
         : TcpTransport(rpc) {}
 protected:
-    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
+    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, qtng::HostAddress *host, quint16 *port) override;
     virtual bool canHandle(const QString &address) override;
     virtual QString getAddressTemplate() override;
 };
@@ -93,7 +93,7 @@ public:
 public:
     void setSslConfiguration(const qtng::SslConfiguration &config) {this->config = config; }
 protected:
-    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, QHostAddress *host, quint16 *port) override;
+    virtual bool makeSocket(const QString &address, QSharedPointer<qtng::SocketLike> *socket, qtng::HostAddress *host, quint16 *port) override;
     virtual bool canHandle(const QString &address) override;
     virtual QString getAddressTemplate() override;
 private:
