@@ -464,9 +464,11 @@ void LafrpcHttpRequestHandler::doPOST()
         sendError(qtng::ServiceUnavailable);
         return;
     }
-    closeConnection = true;
+    closeConnection = Yes;
     sendResponse(qtng::SwitchProtocol);
-    endHeader();
+    if (!endHeader()) {
+        return;
+    }
 
     request->setOption(qtng::Socket::LowDelayOption, true);
 
@@ -522,8 +524,8 @@ QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool *done)
 {
     *done = false;
     const QByteArray &rpcHeader = request->recvall(2);
-    if(rpcHeader == QByteArray("\x4e\x67")) {
-        closeConnection = true;
+    if (rpcHeader == QByteArray("\x4e\x67")) {
+        closeConnection = Yes;
         if(rpc.isNull()) {
             qCDebug(logger) << "rpc is gone.";
             *done = true;
@@ -551,7 +553,7 @@ QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool *done)
         }
         *done = true;
         return QByteArray();
-    } else if(rpcHeader == QByteArray("\x33\x74")) {
+    } else if (rpcHeader == QByteArray("\x33\x74")) {
         const QByteArray &connectionId = request->recvall(16);
         if(request->sendall("\xf3\x97") != 2) {
             qCDebug(logger) << "handshaking is failed in server side.";
