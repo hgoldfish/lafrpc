@@ -235,7 +235,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         QByteArray connectionId;
         QSharedPointer<qtng::SocketLike> rawSocket;
         if (streamFromClient->preferRawSocket) {
-            rawSocket = rpc->makeRawSocket(name, &connectionId);
+            rawSocket = rpc->makeRawSocket(name, connectionId);
             if (rawSocket.isNull() || connectionId.isEmpty()) {
                 qCDebug(logger) << "can not make raw socket to" << name;
             }
@@ -478,7 +478,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
                 QSharedPointer<qtng::SocketLike> rawSocket;
                 QByteArray connectionId;
                 if (streamFromServer->preferRawSocket) {
-                    rawSocket = rpc->makeRawSocket(name, &connectionId);
+                    rawSocket = rpc->makeRawSocket(name, connectionId);
                     if (rawSocket.isNull() || connectionId.isEmpty()) {
                         qCDebug(logger) << "can not make raw sockt to" << name << "for" << request->methodName;
                     }

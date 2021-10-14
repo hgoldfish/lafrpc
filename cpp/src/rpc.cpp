@@ -136,15 +136,15 @@ QList<bool> RpcPrivate::startServers(const QStringList &addresses, bool blocking
 
 QList<bool> RpcPrivate::stopServers(const QStringList &addresses)
 {
-    QList<QString> serverAddressList;
+    const QList<QString> *serverAddressList;
     QList<bool> result;
 
     if (addresses.isEmpty()) {
-        serverAddressList = this->serverAddressList;
+        serverAddressList = &this->serverAddressList;
     } else {
-        serverAddressList = addresses;
+        serverAddressList = &addresses;
     }
-    for (const QString &address: serverAddressList) {
+    for (const QString &address: *serverAddressList) {
         const QString &workerName = makeWorkerName(address);
         bool success = operations->kill(workerName);
         result.append(success);
@@ -238,7 +238,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerName)
 }
 
 
-QSharedPointer<qtng::SocketLike> RpcPrivate::makeRawSocket(const QString &peerName, QByteArray *connectionId)
+QSharedPointer<qtng::SocketLike> RpcPrivate::makeRawSocket(const QString &peerName, QByteArray &connectionId)
 {
     const QString &address = knownAddresses.value(peerName);
     if (address.isEmpty()) {
@@ -518,7 +518,7 @@ void Rpc::shutdown()
 }
 
 
-QSharedPointer<qtng::SocketLike> Rpc::makeRawSocket(const QString &peerName, QByteArray *connectionId)
+QSharedPointer<qtng::SocketLike> Rpc::makeRawSocket(const QString &peerName, QByteArray &connectionId)
 {
     Q_D(Rpc);
     return d->makeRawSocket(peerName, connectionId);

@@ -65,7 +65,7 @@ public:
     bool stopServer(const QString &address);
     void shutdown();
 
-    QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray *connectionId);
+    QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray &connectionId);
     QSharedPointer<qtng::SocketLike> takeRawSocket(const QString &peerName, const QByteArray &connectionId);
     QSharedPointer<Peer> connect(const QString &peerNameOrAddess);
     QSharedPointer<Peer> get(const QString &peerName) const;

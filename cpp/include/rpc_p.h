@@ -22,10 +22,10 @@ public:
     bool setSslConfiguration(const qtng::SslConfiguration &config);
     bool setHttpRootDir(const QDir &rootDir);
     QList<bool> startServers(const QStringList &addresses, bool blocking);
-    QList<bool> stopServers(const QStringList &addresses);
+    QList<bool> stopServers(const QStringList &addresses = QStringList());
     void shutdown();
     QSharedPointer<Peer> connect(const QString &peerName);
-    QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray *connectionId);
+    QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray &connectionId);
     QSharedPointer<qtng::SocketLike> takeRawSocket(const QString &peerName, const QByteArray &connectionId);
     bool isConnected(const QString &peerName) const;
     bool isConnecting(const QString &peerName) const;

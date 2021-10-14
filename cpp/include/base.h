@@ -25,6 +25,7 @@ public:
     QString message;
 };
 
+
 class RpcInternalException: public RpcException
 {
 public:
@@ -69,6 +70,7 @@ public:
     static void raise(const QVariant &v);
 };
 
+
 template<typename T>
 void handleException(const QVariant &v)
 {
@@ -84,6 +86,7 @@ void RpcRemoteException::registerException()
 {
     exceptionHandlers.append(handleException<T>);
 }
+
 
 class RpcSerializationException: public RpcException
 {
