@@ -67,7 +67,7 @@ public:
 
     QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray &connectionId);
     QSharedPointer<qtng::SocketLike> takeRawSocket(const QString &peerName, const QByteArray &connectionId);
-    QSharedPointer<Peer> connect(const QString &peerNameOrAddess);
+    QSharedPointer<Peer> connect(const QString &peerNameOrAddress);
     QSharedPointer<Peer> get(const QString &peerName) const;
     QList<QSharedPointer<Peer>> getAll(const QString &peerName) const;
     QStringList getAllPeerNames() const;
@@ -80,7 +80,7 @@ public:
     QPointer<Peer> getCurrentPeer();
     QVariantMap getRpcHeader();
 
-    QSharedPointer<Peer> preparePeer(const QSharedPointer<qtng::DataChannel> &channel, const QString &name, const QString &address);    friend class Transport;
+    QSharedPointer<Peer> preparePeer(const QSharedPointer<qtng::DataChannel> &channel, const QString &name, const QString &address);
 public:
     static RpcBuilder builder(SerializationType serialization);
 private:
@@ -89,6 +89,7 @@ private:
 private:
     friend class PeerPrivate;
     friend class RpcBuilder;
+    friend class Transport;
 };
 
 

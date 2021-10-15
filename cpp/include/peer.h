@@ -26,8 +26,8 @@ public:
 public:
     void shutdown();
     void close() { shutdown(); }
-    bool isOk() const;
-    bool isActive() const;
+    bool isOk() const;   // peer is connected.
+    bool isActive() const;  // is making calls
     QString name() const;
     void setName(const QString &name);
     QString address() const;

@@ -20,7 +20,7 @@ BEGIN_LAFRPC_NAMESPACE
 inline QByteArray createUuid()
 {
     const QByteArray &id = QUuid::createUuid().toString().toLatin1();
-    if(id.size() > 2) {
+    if (id.size() > 2) {
         return id.mid(1, id.size() - 2);
     } else {
         return id;
@@ -31,7 +31,7 @@ inline QByteArray createUuid()
 inline QString createUuidAsString()
 {
     const QString &id = QUuid::createUuid().toString();
-    if(id.size() > 2) {
+    if (id.size() > 2) {
         return id.mid(1, id.size() - 2);
     } else {
         return id;
@@ -50,11 +50,13 @@ struct Cleaner
 
 typedef std::function<QVariant(const QVariantList&, const QVariantMap &)> RpcFunction;
 
+
 enum ServiceType
 {
     FUNCTION = 1,
     INSTANCE = 2,
 };
+
 
 struct RpcService
 {
@@ -63,6 +65,7 @@ struct RpcService
     RpcFunction function;
     QSharedPointer<QObject> instance;
 };
+
 
 template<typename Base>
 class RegisterServiceMixin: public Base
@@ -79,11 +82,13 @@ protected:
     QMap<QString, RpcService> services;
 };
 
+
 template<typename Base>
 void RegisterServiceMixin<Base>::clearServices()
 {
     services.clear();
 }
+
 
 template<typename Base>
 void RegisterServiceMixin<Base>::registerFunction(const RpcFunction &function, const QString &name)
@@ -94,6 +99,7 @@ void RegisterServiceMixin<Base>::registerFunction(const RpcFunction &function, c
     service.function = function;
     services.insert(name, service);
 }
+
 
 template<typename Base>
 template<typename T>
@@ -113,11 +119,13 @@ void RegisterServiceMixin<Base>::unregisterFunction(const QString &name)
     services.remove(name);
 }
 
+
 template<typename Base>
 void RegisterServiceMixin<Base>::unreigsterInstance(const QString &name)
 {
     services.remove(name);
 }
+
 
 template<typename Base>
 QMap<QString, RpcService> RegisterServiceMixin<Base>::getServices()
@@ -125,11 +133,13 @@ QMap<QString, RpcService> RegisterServiceMixin<Base>::getServices()
     return services;
 }
 
+
 template<typename Base>
 void RegisterServiceMixin<Base>::setServices(const QMap<QString, RpcService> &services)
 {
     this->services = services;
 }
+
 
 END_LAFRPC_NAMESPACE
 

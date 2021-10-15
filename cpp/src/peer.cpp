@@ -650,12 +650,12 @@ QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantLis
 {
     Q_Q(Peer);
     const QStringList &l = methodName.split(QChar('.'));
-    if(l.size() < 1) {
+    if (l.size() < 1) {
         throw RpcRemoteException();
     }
     const QString &serviceName = l[0];
     const QStringList &l2 = l.mid(1);
-    if(!q->getServices().contains(serviceName)) {
+    if (!q->getServices().contains(serviceName)) {
         throw RpcRemoteException();
     }
     const RpcService &rpcService = q->getServices().value(serviceName);
@@ -663,19 +663,33 @@ QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantLis
     QPointer<Rpc> rpc = this->rpc;
     rpc.data()->d_func()->setCurrentPeerAndHeader(q, header);
     Cleaner cleaner([rpc]{
-        if(rpc.isNull())
+        if (rpc.isNull())
             return;
         rpc.data()->d_func()->deleteCurrentPeerAndHeader();
-    });Q_UNUSED(cleaner);
+    }); Q_UNUSED(cleaner);
 
-    if(rpcService.type == ServiceType::FUNCTION) {
-        return rpcService.function(args, kwargs);
+    if (rpcService.type == ServiceType::FUNCTION) {
+        if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+            this->rpc->dd_ptr->loggingCallback->calling(q, methodName, args, kwargs);
+        }
+        try {
+            const QVariant &result = rpcService.function(args, kwargs);
+            if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+                this->rpc->dd_ptr->loggingCallback->success(q, methodName, args, kwargs, result);
+            }
+            return result;
+        } catch (...) {
+            if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+                this->rpc->dd_ptr->loggingCallback->failed(q, methodName, args, kwargs);
+            }
+            throw;
+        }
     } else {
-        if(l2.isEmpty()) {
+        if (l2.isEmpty()) {
             throw RpcRemoteException();
         }
         const QSharedPointer<Callable> &callable = qSharedPointerDynamicCast<Callable>(rpcService.instance);
-        if(callable.isNull()) {
+        if (callable.isNull()) {
             try {
                 if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
                     this->rpc->dd_ptr->loggingCallback->calling(q, methodName, args, kwargs);
@@ -871,6 +885,7 @@ QSharedPointer<qtng::DataChannel> Peer::makeChannel()
     return d->channel->makeChannel();
 }
 
+
 QSharedPointer<qtng::DataChannel> Peer::takeChannel(quint32 channelNumber)
 {
     Q_D(Peer);
@@ -878,7 +893,6 @@ QSharedPointer<qtng::DataChannel> Peer::takeChannel(quint32 channelNumber)
         return QSharedPointer<qtng::DataChannel>();
     }
     return d->channel->takeChannel(channelNumber);
-
 }
 
 END_LAFRPC_NAMESPACE

@@ -265,10 +265,7 @@ KcpSocketWithFilter::KcpSocketWithFilter(qtng::HostAddress::NetworkLayerProtocol
 
 bool KcpSocketWithFilter::filter(char *data, qint32 *len, HostAddress *addr, quint16 *port)
 {
-    if (rpc.isNull()) {
-        return false;
-    }
-    if (rpc->kcpFilter().isNull()) {
+    if (rpc.isNull() || rpc->kcpFilter().isNull()) {
         return false;
     }
     return rpc->kcpFilter()->filter(this, data, len, addr, port);
@@ -416,7 +413,7 @@ void LafrpcHttpRequestHandler::doPOST()
     request->setOption(qtng::Socket::LowDelayOption, true);
 
     const QByteArray &rpcHeader = request->recvall(2);
-    if(rpcHeader == QByteArray("\x4e\x67")) {
+    if (rpcHeader == QByteArray("\x4e\x67")) {
         if (rpc.isNull()) {
             qCDebug(logger) << "rpc is gone.";
             return;
@@ -441,7 +438,7 @@ void LafrpcHttpRequestHandler::doPOST()
         if (!peer.isNull()) {
             closeRequest = false;
         }
-    } else if(rpcHeader == QByteArray("\x33\x74")) {
+    } else if (rpcHeader == QByteArray("\x33\x74")) {
         const QByteArray &connectionId = request->recvall(16);
         if (request->sendall("\xf3\x97") != 2) {
             qCDebug(logger) << "handshaking is failed in server side.";
