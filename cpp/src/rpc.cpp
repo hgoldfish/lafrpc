@@ -373,7 +373,7 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
         peer->setProperty("peer_certificate_hash", certHash);
     }
 
-    peers.insertMulti(itsPeerName, peer);
+    peers.insert(itsPeerName, peer);
     QPointer<Rpc> self(q);
     qtng::callInEventLoopAsync([peer, self] {
         if (self.isNull()) {
