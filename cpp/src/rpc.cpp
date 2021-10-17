@@ -614,7 +614,15 @@ QVariantMap Rpc::getRpcHeader()
 }
 
 
-QSharedPointer<Peer> Rpc::preparePeer(const QSharedPointer<qtng::DataChannel> &channel, const QString &name, const QString &address)
+void Rpc::handleRequest(QSharedPointer<qtng::SocketLike> connection)
+{
+    Q_D(Rpc);
+    QSharedPointer<TcpTransport> tcpTransport = d->transports.first().dynamicCast<TcpTransport>();
+    tcpTransport->handleRequest(connection);
+}
+
+
+QSharedPointer<Peer> Rpc::preparePeer(QSharedPointer<qtng::DataChannel> channel, const QString &name, const QString &address)
 {
     Q_D(Rpc);
     return d->preparePeer(channel, name, address);

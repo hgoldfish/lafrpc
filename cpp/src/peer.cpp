@@ -147,7 +147,7 @@ void PeerPrivate::shutdown()
 {
     // THIS FUNC WOULD BE CALLED IN EVENTLOOP
     Q_Q(Peer);
-    if(broken) {
+    if (broken) {
         return;
     }
     broken = true;
@@ -184,7 +184,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     Q_Q(Peer);
     bool success;
 
-    if(broken || rpc.isNull()) {
+    if (broken || rpc.isNull()) {
         throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
     }
 
@@ -217,7 +217,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     request.methodName = methodName;
     request.args = args;
     request.kwargs = kwargs;
-    if(!rpc->dd_ptr->headerCallback.isNull()) {
+    if (!rpc->dd_ptr->headerCallback.isNull()) {
         request.header = rpc->dd_ptr->headerCallback->make(q, methodName);
         if(broken || rpc.isNull()) {
             throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
@@ -249,10 +249,10 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     }
 
     QByteArray requestBytes = packRequest(rpc.data()->serialization(), request);
-    if(requestBytes.isEmpty()) {
+    if (requestBytes.isEmpty()) {
         throw RpcSerializationException(QStringLiteral("can not serialize request while calling remote method: %1").arg(methodName));
     }
-    if(broken || rpc.isNull()) {
+    if (broken || rpc.isNull()) {
         throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
     }
 
@@ -260,12 +260,12 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     waiters.insert(request.id, waiter);
 
     success = channel->sendPacket(requestBytes);
-    if(!success) {
+    if (!success) {
         shutdown();
         throw RpcDisconnectedException("can not send packet.");
     }
 
-    if(broken || rpc.isNull()) {
+    if (broken || rpc.isNull()) {
         throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
     }
 
@@ -289,16 +289,16 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         throw RpcInternalException(message);
     }
 
-    if(response.isNull() || !response->isOk()) {
+    if (response.isNull() || !response->isOk()) {
         const QString &message = QStringLiteral("got empty response while waiting response of remote method: `%1`").arg(methodName);
         throw RpcDisconnectedException(message);
     }
 
-    if(broken || rpc.isNull()) {
+    if (broken || rpc.isNull()) {
         throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
     }
 
-    if(!response->exception.isNull()) {
+    if (!response->exception.isNull()) {
         RpcRemoteException::raise(response->exception);
         // the upper function do not return if success.
         throw RpcInternalException("unknown exception.");
@@ -330,6 +330,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     }
     return response->result;
 }
+
 
 void PeerPrivate::handlePacket()
 {
@@ -376,6 +377,7 @@ void PeerPrivate::handlePacket()
         }
     }
 }
+
 
 void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 {
@@ -517,6 +519,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
     }
 }
 
+
 QByteArray removeNamespace(const QByteArray &typeName)
 {
     if (typeName.isEmpty()) {
@@ -546,6 +549,7 @@ QByteArray removeNamespace(const QByteArray &typeName)
     }
 }
 
+
 int metaTypeOf(const char *typeNameBytes)
 {
     QByteArray typeName(typeNameBytes);
@@ -572,6 +576,7 @@ int metaTypeOf(const char *typeNameBytes)
         }
     }
 }
+
 
 QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, QVariantMap kwargs)
 {
@@ -643,8 +648,8 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
     found.invoke(obj, Qt::DirectConnection, rarg, parameters[0], parameters[1], parameters[2], parameters[3],
             parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9]);
     return rvalue;
-
 }
+
 
 QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs, const QVariantMap &header)
 {
