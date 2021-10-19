@@ -80,7 +80,7 @@ public:
     QPointer<Peer> getCurrentPeer();
     QVariantMap getRpcHeader();
 
-    void handleRequest(QSharedPointer<qtng::SocketLike> connection);
+    void handleRequest(QSharedPointer<qtng::SocketLike> connection, const QString &address);
     QSharedPointer<Peer> preparePeer(QSharedPointer<qtng::DataChannel> channel, const QString &name, const QString &address);
 public:
     static RpcBuilder builder(SerializationType serialization);

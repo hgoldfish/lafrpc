@@ -32,9 +32,10 @@ RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *
     }
     transports.append(QSharedPointer<Transport>(new TcpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new SslTransport(parent)));
-    transports.append(QSharedPointer<Transport>(new HttpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new KcpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new KcpSslTransport(parent)));
+    transports.append(QSharedPointer<Transport>(new HttpTransport(parent)));
+    transports.append(QSharedPointer<Transport>(new HttpsTransport(parent)));
     registerClass<RpcRemoteException>();
     registerClass<RpcFile>();
     registerClass<RpcDir>();
@@ -57,15 +58,15 @@ bool RpcPrivate::setSslConfiguration(const qtng::SslConfiguration &config)
     } else {
         ok = false;
     }
-    QSharedPointer<HttpTransport> httpTransport = transports.at(2).dynamicCast<HttpTransport>();
-    if (!httpTransport.isNull()) {
-        httpTransport->setSslConfiguration(config);
+    QSharedPointer<KcpSslTransport> kcpSslTransport = transports.at(3).dynamicCast<KcpSslTransport>();
+    if (!kcpSslTransport.isNull()) {
+        kcpSslTransport->setSslConfiguration(config);
     } else {
         ok = false;
     }
-    QSharedPointer<KcpSslTransport> kcpSslTransport = transports.at(4).dynamicCast<KcpSslTransport>();
-    if (!kcpSslTransport.isNull()) {
-        kcpSslTransport->setSslConfiguration(config);
+    QSharedPointer<HttpsTransport> httpsTransport = transports.at(5).dynamicCast<HttpsTransport>();
+    if (!httpsTransport.isNull()) {
+        httpsTransport->setSslConfiguration(config);
     } else {
         ok = false;
     }
@@ -75,12 +76,20 @@ bool RpcPrivate::setSslConfiguration(const qtng::SslConfiguration &config)
 
 bool RpcPrivate::setHttpRootDir(const QDir &rootDir)
 {
-    QSharedPointer<HttpTransport> httpTransport = transports.at(2).dynamicCast<HttpTransport>();
+    bool ok = true;
+    QSharedPointer<HttpTransport> httpTransport = transports.at(4).dynamicCast<HttpTransport>();
     if (!httpTransport.isNull()) {
         httpTransport->setRootDir(rootDir);
-        return true;
+    } else {
+        ok = false;
     }
-    return false;
+    QSharedPointer<HttpsTransport> httpsTransport = transports.at(5).dynamicCast<HttpsTransport>();
+    if (!httpsTransport.isNull()) {
+        httpsTransport->setRootDir(rootDir);
+    } else {
+        ok = false;
+    }
+    return ok;
 }
 
 
@@ -614,11 +623,16 @@ QVariantMap Rpc::getRpcHeader()
 }
 
 
-void Rpc::handleRequest(QSharedPointer<qtng::SocketLike> connection)
+void Rpc::handleRequest(QSharedPointer<qtng::SocketLike> connection, const QString &address)
 {
     Q_D(Rpc);
-    QSharedPointer<TcpTransport> tcpTransport = d->transports.first().dynamicCast<TcpTransport>();
-    tcpTransport->handleRequest(connection);
+    for (QSharedPointer<Transport> transport: d->transports) {
+        if (transport->canHandle(address)) {
+            QByteArray rpcHeader;
+            bool done;
+            transport->handleRequest(connection, rpcHeader, done);
+        }
+    }
 }
 
 
