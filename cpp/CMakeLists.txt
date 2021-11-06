@@ -28,6 +28,7 @@ set(LAFRPC_INCLUDE
     include/rpc.h
     include/utils.h
     include/serialization.h
+    include/serialization_p.h
     include/base.h
     include/transport.h
     include/rpc_p.h

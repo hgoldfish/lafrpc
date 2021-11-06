@@ -53,6 +53,8 @@ signals:
 public:
     quint32 maxPacketSize() const;
     void setMaxPacketSize(quint32 maxPacketSize);
+    float keepaliveTimeout() const;
+    void setKeepaliveTimeout(float keepaliveTimeout);
     QString myPeerName() const;
     QSharedPointer<Serialization> serialization() const;
     QSharedPointer<HeaderCallback> headerCallback() const;
@@ -104,8 +106,10 @@ public:
     RpcBuilder &loggingCallback(QSharedPointer<LoggingCallback> loggingCallback);
     RpcBuilder &kcpFilter(QSharedPointer<KcpFilter> kcpFilter);
     RpcBuilder &maxPacketSize(quint32 maxPacketSize);
+    RpcBuilder &keepaliveTimeout(float keepaliveTimeout);
     RpcBuilder &myPeerName(const QString &myPeerName);
     RpcBuilder &httpRootDir(const QDir &rootDir);
+    RpcBuilder &httpSession(const QSharedPointer<qtng::HttpSession> session);
 
     QSharedPointer<Rpc> create();
 private:
@@ -115,3 +119,4 @@ private:
 END_LAFRPC_NAMESPACE
 
 #endif //LAFRPC_RPC_H
+

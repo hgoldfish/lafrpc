@@ -1,16 +1,20 @@
-#include <QtCore/QJsonDocument>
-#include <QtCore/QJsonValue>
-#include <QtCore/QJsonArray>
-#include <QtCore/QJsonObject>
-#include <QtCore/QDataStream>
-#include <QtCore/QtEndian>
+#include <QtCore/qjsondocument.h>
+#include <QtCore/qjsonvalue.h>
+#include <QtCore/qjsonarray.h>
+#include <QtCore/qjsonobject.h>
+#include <QtCore/qdatastream.h>
+#include <QtCore/qendian.h>
+#include <QtCore/qdebug.h>
 #include "../include/serialization.h"
 
 BEGIN_LAFRPC_NAMESPACE
 
 const QString Serialization::SpecialSidKey = "__laf_sid__";
-QMap<QString, SerializableInfo> Serialization::classes;
-
+QMap<QString, detail::SerializableInfo> Serialization::classes;
+namespace detail {
+    QList<std::function<void(const QVariant &)> > exceptionRaisers;
+    QList<std::function<QSharedPointer<UseStream>(const QVariant &)> > useStreamConvertors;
+}
 
 Serialization::~Serialization()
 {
@@ -48,8 +52,8 @@ QVariant Serialization::saveState(const QVariant &obj)
         }
         return result;
     } else {
-        for (QMap<QString, SerializableInfo>::const_iterator itor = classes.constBegin(); itor != classes.constEnd(); ++itor) {
-            const SerializableInfo &info = itor.value();
+        for (QMap<QString, detail::SerializableInfo>::const_iterator itor = classes.constBegin(); itor != classes.constEnd(); ++itor) {
+            const detail::SerializableInfo &info = itor.value();
             if (info.metaTypeId == obj.userType()) {
                 void *p = info.serializer->toVoid(obj);
                 if(!p) {
@@ -100,7 +104,7 @@ QVariant Serialization::restoreState(const QVariant &data)
         if (result.contains(Serialization::SpecialSidKey)) {
             const QString &lafrpcKey = result.value(Serialization::SpecialSidKey).toString();
             if (classes.contains(lafrpcKey)) {
-                const SerializableInfo &info = classes[lafrpcKey];
+                const detail::SerializableInfo &info = classes[lafrpcKey];
                 void *p = info.serializer->create();
                 if (info.serializer->restoreState(p, result)) {
                     return info.serializer->fromVoid(p);

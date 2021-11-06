@@ -179,6 +179,31 @@ void PeerPrivate::shutdown()
 }
 
 
+static void raiseRpcRemoteException(const QVariant &v)
+{
+    for (std::function<void(const QVariant &v)> func: detail::exceptionRaisers) {
+        func(v);
+    }
+    QSharedPointer<RpcRemoteException> e = v.value<QSharedPointer<RpcRemoteException>>();
+    if (!e.isNull()) {
+        e->raise();
+    }
+}
+
+
+static QSharedPointer<UseStream> convertUseStream(const QVariant &v)
+{
+    for (std::function<QSharedPointer<UseStream>(const QVariant &)> f: detail::useStreamConvertors) {
+        QSharedPointer<UseStream> p = f(v);
+        if (!p.isNull()) {
+            return p;
+        }
+    }
+    return QSharedPointer<UseStream>();
+}
+
+
+
 QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs)
 {
     Q_Q(Peer);
@@ -190,7 +215,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
     QSharedPointer<UseStream> streamFromClient;
     for (const QVariant &v: args) {
-        QSharedPointer<UseStream> p = UseStream::convert(v);
+        QSharedPointer<UseStream> p = convertUseStream(v);
         if (!p.isNull()) {
             if (!streamFromClient.isNull()) {
                 qCWarning(logger) << "there is two use stream arguments in" << methodName;
@@ -201,7 +226,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         }
     }
     for (const QVariant &v: kwargs.values()) {
-        QSharedPointer<UseStream> p = UseStream::convert(v);
+        QSharedPointer<UseStream> p = convertUseStream(v);
         if (!p.isNull()) {
             if (!streamFromClient.isNull()) {
                 qCWarning(logger) << "there is two use stream arguments in" << methodName;
@@ -243,7 +268,9 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
                 throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
             }
         }
-        streamFromClient->init(rpc, UseStream::ClientSide | UseStream::ParamInRequest, subChannelFromClient, rawSocket);
+        streamFromClient->place = UseStream::ClientSide | UseStream::ParamInRequest;
+        streamFromClient->channel = subChannelFromClient;
+        streamFromClient->rawSocket = rawSocket;
         request.channel = subChannelFromClient->channelNumber();
         request.rawSocket = connectionId;
     }
@@ -270,7 +297,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     }
 
     if (!streamFromClient.isNull()) {
-        streamFromClient->setReady();
+        streamFromClient->ready.set();
     }
 
     QSharedPointer<Response> response;
@@ -299,12 +326,12 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     }
 
     if (!response->exception.isNull()) {
-        RpcRemoteException::raise(response->exception);
+        raiseRpcRemoteException(response->exception);
         // the upper function do not return if success.
         throw RpcInternalException("unknown exception.");
     }
 
-    QSharedPointer<UseStream> streamFromServer = UseStream::convert(response->result);
+    QSharedPointer<UseStream> streamFromServer = convertUseStream(response->result);
     if (!streamFromServer.isNull()) {
         if (response->channel == 0) {
             qCWarning(logger) << "the response of" << methodName << "is a use-stream, but has no channel number.";
@@ -325,8 +352,10 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
                 qCWarning(logger) << "the response of" << methodName << "returns a raw socket, but is gone:" << response->rawSocket;
             }
         }
-        streamFromServer->init(rpc, UseStream::ClientSide | UseStream::ValueOfResponse, subChannelFromServer, rawSocket);
-        streamFromServer->setReady();
+        streamFromServer->place = UseStream::ClientSide | UseStream::ValueOfResponse;
+        streamFromServer->channel = subChannelFromServer;
+        streamFromServer->rawSocket = rawSocket;
+        streamFromServer->ready.set();
     }
     return response->result;
 }
@@ -399,14 +428,14 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 
     QSharedPointer<UseStream> streamFromClient;
     for (const QVariant &v: request->args) {
-        streamFromClient = UseStream::convert(v);
+        streamFromClient = convertUseStream(v);
         if (!streamFromClient.isNull()) {
             break;
         }
     }
     if (streamFromClient.isNull()) {
         for (const QVariant &v: request->kwargs.values()) {
-            streamFromClient = UseStream::convert(v);
+            streamFromClient = convertUseStream(v);
             if (!streamFromClient.isNull()) {
                 break;
             }
@@ -438,14 +467,16 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
                         qCWarning(logger) << request->methodName << "sent an use-stream raw socket, but it is gone.";
                     }
                 }
-                streamFromClient->init(rpc, UseStream::ServerSide | UseStream::ParamInRequest, subChannelFromClient, rawSocket);
+                streamFromClient->place = UseStream::ServerSide | UseStream::ParamInRequest;
+                streamFromClient->channel = subChannelFromClient;
+                streamFromClient->rawSocket = rawSocket;
             }
         }
     }
 
     if (response.exception.isNull()) {
         if (!streamFromClient.isNull()) {
-            streamFromClient->setReady();
+            streamFromClient->ready.set();
         }
         try {
             response.result = lookupAndCall(request->methodName, request->args, request->kwargs, request->header);
@@ -466,7 +497,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 
     QSharedPointer<UseStream> streamFromServer;
     if (response.exception.isNull()) {
-        streamFromServer = UseStream::convert(response.result);
+        streamFromServer = convertUseStream(response.result);
         if (!streamFromServer.isNull()) {
             QSharedPointer<qtng::VirtualChannel> subChannelFromServer = channel->makeChannel();
             if (broken || rpc.isNull()) {
@@ -488,7 +519,9 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
                         return;
                     }
                 }
-                streamFromServer->init(rpc, UseStream::ServerSide | UseStream::ValueOfResponse, subChannelFromServer, rawSocket);
+                streamFromServer->place = UseStream::ServerSide | UseStream::ValueOfResponse;
+                streamFromServer->channel = subChannelFromServer;
+                streamFromServer->rawSocket = rawSocket;
                 response.channel = subChannelFromServer->channelNumber();
                 response.rawSocket = connectionId;
             }
@@ -515,7 +548,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
     }
 
     if (!streamFromServer.isNull()) {
-        streamFromServer->setReady();
+        streamFromServer->ready.set();
     }
 }
 
@@ -881,21 +914,21 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
 }
 
 
-QSharedPointer<qtng::DataChannel> Peer::makeChannel()
+QSharedPointer<qtng::VirtualChannel> Peer::makeChannel()
 {
     Q_D(Peer);
     if (!isOk()) {
-        return QSharedPointer<qtng::DataChannel>();
+        return QSharedPointer<qtng::VirtualChannel>();
     }
     return d->channel->makeChannel();
 }
 
 
-QSharedPointer<qtng::DataChannel> Peer::takeChannel(quint32 channelNumber)
+QSharedPointer<qtng::VirtualChannel> Peer::takeChannel(quint32 channelNumber)
 {
     Q_D(Peer);
     if (!isOk()) {
-        return QSharedPointer<qtng::DataChannel>();
+        return QSharedPointer<qtng::VirtualChannel>();
     }
     return d->channel->takeChannel(channelNumber);
 }

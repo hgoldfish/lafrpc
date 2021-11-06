@@ -337,7 +337,9 @@ bool RpcFile::readFromPath(ProgressCallback progressCallback)
 bool RpcFile::writeTo(QFile &f, RpcFile::ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    waitForReady();
+    if (!ready.wait()) {
+        return false;
+    }
     if (rawSocket.isNull()) {
         return d->recvfileViaChannel(&f, progressCallback ? progressCallback : defaultProgressCallback, QByteArray());
     } else {
@@ -349,7 +351,9 @@ bool RpcFile::writeTo(QFile &f, RpcFile::ProgressCallback progressCallback)
 bool RpcFile::readFrom(QFile &f, RpcFile::ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    waitForReady();
+    if (!ready.wait()) {
+        return false;
+    }
     if (rawSocket.isNull()) {
         return d->sendfileViaChannel(&f, progressCallback ? progressCallback : defaultProgressCallback);
     } else {
@@ -361,7 +365,9 @@ bool RpcFile::readFrom(QFile &f, RpcFile::ProgressCallback progressCallback)
 bool RpcFile::sendall(const QByteArray &data, ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    waitForReady();
+    if (!ready.wait()) {
+        return false;
+    }
     QByteArray bs = data;
     QBuffer buf(&bs);
     if (!buf.open(QIODevice::ReadOnly)) {
@@ -381,7 +387,9 @@ bool RpcFile::sendall(const QByteArray &data, ProgressCallback progressCallback)
 bool RpcFile::recvall(QByteArray &data, ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    waitForReady();
+    if (!ready.wait()) {
+        return false;
+    }
     QBuffer buf(&data);
     if (!buf.open(QIODevice::WriteOnly)) {
         if (progressCallback) {

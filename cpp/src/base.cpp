@@ -4,15 +4,13 @@
 BEGIN_LAFRPC_NAMESPACE
 
 
-QList<std::function<void(const QVariant &v)>> RpcRemoteException::exceptionHandlers;
-QList<std::function<QSharedPointer<UseStream>(const QVariant &)>> UseStream::handlers;
-
-
 RpcException::RpcException(const RpcException &other)
     :message(other.message)
 {}
 
+
 RpcException::~RpcException() {}
+
 
 RpcException::RpcException(RpcException &&other)
 {
@@ -28,7 +26,7 @@ void RpcException::raise()
 
 QString RpcException::what() const
 {
-    if(message.isEmpty()) {
+    if (message.isEmpty()) {
         return QString::fromUtf8("rpc exception.");
     } else {
         return message;
@@ -44,7 +42,7 @@ void RpcInternalException::raise()
 
 QString RpcInternalException::what() const
 {
-    if(message.isEmpty()) {
+    if (message.isEmpty()) {
         return QString::fromUtf8("rpc got internal exception.");
     } else {
         return message;
@@ -60,7 +58,7 @@ void RpcDisconnectedException::raise()
 
 QString RpcDisconnectedException::what() const
 {
-    if(message.isEmpty()) {
+    if (message.isEmpty()) {
         return QString::fromUtf8("rpc is disconnected.");
     } else {
         return message;
@@ -76,7 +74,7 @@ void RpcRemoteException::raise()
 
 QString RpcRemoteException::what() const
 {
-    if(message.isEmpty()) {
+    if (message.isEmpty()) {
         return QString::fromUtf8("remote peer throw an exception.");
     } else {
         return message;
@@ -99,18 +97,6 @@ bool RpcRemoteException::restoreState(const QVariantMap &state)
 }
 
 
-void RpcRemoteException::raise(const QVariant &v)
-{
-    QSharedPointer<RpcRemoteException> e = v.value<QSharedPointer<RpcRemoteException>>();
-    if (!e.isNull()) {
-        e->raise();
-    }
-    for (std::function<void(const QVariant &v)> func: exceptionHandlers) {
-        func(v);
-    }
-}
-
-
 QVariant RpcRemoteException::clone()
 {
     QSharedPointer<RpcRemoteException> e(new RpcRemoteException(message));
@@ -126,35 +112,11 @@ void RpcSerializationException::raise()
 
 QString RpcSerializationException::what() const
 {
-    if(message.isEmpty()) {
+    if (message.isEmpty()) {
         return QString::fromUtf8("can not serialize object.");
     } else {
         return message;
     }
-}
-
-UseStream::~UseStream() {}
-
-
-void UseStream::init(QPointer<Rpc> &rpc, QFlags<Place> place, QSharedPointer<qtng::VirtualChannel> &channel,
-                     QSharedPointer<qtng::SocketLike> rawSocket)
-{
-    serialization = rpc->serialization();
-    this->place = place;
-    this->channel = channel;
-    this->rawSocket = rawSocket;
-}
-
-
-QSharedPointer<UseStream> UseStream::convert(const QVariant &v)
-{
-    for (std::function<QSharedPointer<UseStream>(const QVariant &)> f: handlers) {
-        QSharedPointer<UseStream> p = f(v);
-        if (!p.isNull()) {
-            return p;
-        }
-    }
-    return QSharedPointer<UseStream>();
 }
 
 

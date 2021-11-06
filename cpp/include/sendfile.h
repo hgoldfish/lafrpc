@@ -43,7 +43,7 @@ public:
 public:
     QVariantMap saveState();
     bool restoreState(const QVariantMap &state);
-    static QString lafrpcKey() { return "RpcFile"; }
+    static QString lafrpcKey() { return QString::fromLatin1("RpcFile"); }
 public:
     RpcFilePrivate * const d_ptr;
     Q_DECLARE_PRIVATE(RpcFile)

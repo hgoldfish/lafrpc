@@ -20,14 +20,15 @@ KcpFilter::~KcpFilter() {}
 
 
 RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *parent)
-    : maxPacketSize(1024 * 1024 * 1024)
+    : maxPacketSize(1024 * 1024 * 64)
+    , keepaliveTimeout(1000 * 20)
     , serialization(serialization)
     , operations(new qtng::CoroutineGroup)
     , dnsCache(new qtng::SocketDnsCache())
     , q_ptr(parent)
 {
     myPeerName = createUuidAsString();
-    if(this->serialization.isNull()) {
+    if (this->serialization.isNull()) {
         this->serialization.reset(new MessagePackSerialization());
     }
     transports.append(QSharedPointer<Transport>(new TcpTransport(parent)));
@@ -54,19 +55,19 @@ bool RpcPrivate::setSslConfiguration(const qtng::SslConfiguration &config)
     bool ok = true;
     QSharedPointer<SslTransport> sslTransport = transports.at(1).dynamicCast<SslTransport>();
     if (!sslTransport.isNull()) {
-        sslTransport->setSslConfiguration(config);
+        sslTransport->config = config;
     } else {
         ok = false;
     }
     QSharedPointer<KcpSslTransport> kcpSslTransport = transports.at(3).dynamicCast<KcpSslTransport>();
     if (!kcpSslTransport.isNull()) {
-        kcpSslTransport->setSslConfiguration(config);
+        kcpSslTransport->config = config;
     } else {
         ok = false;
     }
     QSharedPointer<HttpsTransport> httpsTransport = transports.at(5).dynamicCast<HttpsTransport>();
     if (!httpsTransport.isNull()) {
-        httpsTransport->setSslConfiguration(config);
+        httpsTransport->config = config;
     } else {
         ok = false;
     }
@@ -79,13 +80,32 @@ bool RpcPrivate::setHttpRootDir(const QDir &rootDir)
     bool ok = true;
     QSharedPointer<HttpTransport> httpTransport = transports.at(4).dynamicCast<HttpTransport>();
     if (!httpTransport.isNull()) {
-        httpTransport->setRootDir(rootDir);
+        httpTransport->rootDir = rootDir;
     } else {
         ok = false;
     }
     QSharedPointer<HttpsTransport> httpsTransport = transports.at(5).dynamicCast<HttpsTransport>();
     if (!httpsTransport.isNull()) {
-        httpsTransport->setRootDir(rootDir);
+        httpsTransport->rootDir = rootDir;
+    } else {
+        ok = false;
+    }
+    return ok;
+}
+
+
+bool RpcPrivate::setHttpSession(QSharedPointer<qtng::HttpSession> session)
+{
+    bool ok = true;
+    QSharedPointer<HttpTransport> httpTransport = transports.at(4).dynamicCast<HttpTransport>();
+    if (!httpTransport.isNull()) {
+        httpTransport->session = session;
+    } else {
+        ok = false;
+    }
+    QSharedPointer<HttpsTransport> httpsTransport = transports.at(5).dynamicCast<HttpsTransport>();
+    if (!httpsTransport.isNull()) {
+        httpsTransport->session = session;
     } else {
         ok = false;
     }
@@ -451,6 +471,20 @@ void Rpc::setMaxPacketSize(quint32 maxPacketSize)
 }
 
 
+float Rpc::keepaliveTimeout() const
+{
+    Q_D(const Rpc);
+    return d->keepaliveTimeout / 1000.0f;
+}
+
+
+void Rpc::setKeepaliveTimeout(float keepaliveTimeout)
+{
+    Q_D(Rpc);
+    d->keepaliveTimeout = static_cast<quint64>(keepaliveTimeout * 1000.0f);
+}
+
+
 QString Rpc::myPeerName() const
 {
     Q_D(const Rpc);
@@ -715,6 +749,15 @@ RpcBuilder &RpcBuilder::maxPacketSize(quint32 maxPacketSize)
 }
 
 
+RpcBuilder &RpcBuilder::keepaliveTimeout(float keepaliveTimeout)
+{
+    if (!rpc.isNull()) {
+        rpc->d_func()->keepaliveTimeout = static_cast<quint64>(keepaliveTimeout * 1000.0f);
+    }
+    return *this;
+}
+
+
 RpcBuilder &RpcBuilder::myPeerName(const QString &myPeerName)
 {
     if (!rpc.isNull()) {
@@ -728,6 +771,14 @@ RpcBuilder &RpcBuilder::httpRootDir(const QDir &rootDir)
 {
     if (!rpc.isNull()) {
         rpc->d_func()->setHttpRootDir(rootDir);
+    }
+    return *this;
+}
+
+RpcBuilder &RpcBuilder::httpSession(const QSharedPointer<qtng::HttpSession> session)
+{
+    if (!rpc.isNull()) {
+        rpc->d_func()->setHttpSession(session);
     }
     return *this;
 }

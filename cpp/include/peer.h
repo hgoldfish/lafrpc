@@ -11,6 +11,7 @@
 
 namespace qtng {
 class DataChannel;
+class VirtualChannel;
 }
 
 BEGIN_LAFRPC_NAMESPACE
@@ -57,8 +58,8 @@ public:
                   const QVariant &arg6, const QVariant &arg7, const QVariant &arg8,
                   const QVariant &arg9);
 
-    QSharedPointer<qtng::DataChannel> makeChannel();
-    QSharedPointer<qtng::DataChannel> takeChannel(quint32 channelNumber);
+    QSharedPointer<qtng::VirtualChannel> makeChannel();
+    QSharedPointer<qtng::VirtualChannel> takeChannel(quint32 channelNumber);
 signals:
     void disconnected(Peer *self);
 private:

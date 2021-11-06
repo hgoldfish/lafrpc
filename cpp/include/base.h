@@ -57,35 +57,12 @@ public:
 public:
     virtual QString what() const override;
     virtual void raise() override;
+    virtual QVariant clone();
 public:
-    // to support serialization.
     QVariantMap saveState() const;
     bool restoreState(const QVariantMap &state);
     static QString lafrpcKey() { return "RpcRemoteException"; }
-public:
-    // to support user-defined exception.
-    virtual QVariant clone();
-    static QList<std::function<void(const QVariant &v)>> exceptionHandlers;
-    template<typename T> static void registerException();
-    static void raise(const QVariant &v);
 };
-
-
-template<typename T>
-void handleException(const QVariant &v)
-{
-    QSharedPointer<T> t = v.value<QSharedPointer<T>>();
-    if (!t.isNull()) {
-        t->raise();
-    }
-}
-
-
-template<typename T>
-void RpcRemoteException::registerException()
-{
-    exceptionHandlers.append(handleException<T>);
-}
 
 
 class RpcSerializationException: public RpcException
@@ -122,55 +99,16 @@ struct UseStream
     QFlags<Place> place;
     bool preferRawSocket;
     QSharedPointer<qtng::SocketLike> rawSocket;
-    QSharedPointer<qtng::Event> ready;
-    QSharedPointer<Serialization> serialization;
+    qtng::Event ready;
 
     UseStream()
-        :place(ServerSide | ValueOfResponse), preferRawSocket(false), ready(new qtng::Event)
+        :place(ServerSide | ValueOfResponse), preferRawSocket(false)
     {}
 
-    virtual ~UseStream();
+    virtual ~UseStream() {}
 
-    void init(QPointer<Rpc> &rpc, QFlags<Place> place, QSharedPointer<qtng::VirtualChannel> &channel,
-              QSharedPointer<qtng::SocketLike> rawSocket);
-
-    void setReady()
-    {
-        ready->set();
-    }
-
-    void waitForReady()
-    {
-        ready->wait();
-    }
-
-    //support for use defined use-stream
-    static QList<std::function<QSharedPointer<UseStream>(const QVariant &)>> handlers;
-    static QSharedPointer<UseStream> convert(const QVariant &v);
-    template<typename T> static void registerClass();
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(UseStream::Places)
-
-
-template<typename T>
-QSharedPointer<UseStream> convert_template(const QVariant &v)
-{
-    if (v.canConvert<QSharedPointer<T>>()) {
-        QSharedPointer<T> p = v.value<QSharedPointer<T>>();
-        if (!p.isNull()) {
-            return qSharedPointerDynamicCast<UseStream>(p);
-//            return p.dynamicCast<UseStream>();
-        }
-    }
-    return QSharedPointer<UseStream>();
-}
-
-
-template<typename T>
-void UseStream::registerClass()
-{
-    handlers.append(convert_template<T>);
-}
 
 
 struct Request
@@ -184,7 +122,7 @@ struct Request
     QByteArray rawSocket;
 
     Request()
-        :channel(0)
+        : channel(0)
     {}
 
     bool isOk() const { return !id.isEmpty() && !methodName.isEmpty(); }
@@ -200,7 +138,7 @@ struct Response
     QByteArray rawSocket;
 
     Response()
-        :channel(0)
+        : channel(0)
     {}
 
     bool isOk() const { return !id.isEmpty(); }

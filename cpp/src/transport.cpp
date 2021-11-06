@@ -91,7 +91,7 @@ QSharedPointer<qtng::DataChannel> Transport::connect(const QString &address, flo
         qCDebug(logger) << "handshaking is failed in client side.";
         return QSharedPointer<qtng::DataChannel>();
     }
-    QSharedPointer<qtng::DataChannel> channel(new qtng::SocketChannel(request, qtng::PositivePole));
+    QSharedPointer<qtng::SocketChannel> channel(new qtng::SocketChannel(request, qtng::PositivePole));
     setupChannel(request, channel);
     return channel;
 }
@@ -138,12 +138,13 @@ QSharedPointer<qtng::SocketLike> Transport::takeRawSocket(const QByteArray &conn
 }
 
 
-void Transport::setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::DataChannel> channel)
+void Transport::setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::SocketChannel> channel)
 {
     if (rpc.isNull()) {
         return;
     }
     channel->setMaxPacketSize(rpc->maxPacketSize());
+    channel->setKeepaliveTimeout(rpc->keepaliveTimeout());
 
     QSharedPointer<qtng::SslSocket> ssl = qtng::convertSocketLikeToSslSocket(request);
     QSharedPointer<qtng::KcpSocket> kcp;
@@ -177,7 +178,7 @@ void Transport::handleRequest(QSharedPointer<qtng::SocketLike> request, QByteArr
     rpcHeader = request->recvall(2);
     if (rpcHeader == QByteArray("\x4e\x67")) {
         done = true;
-        QSharedPointer<qtng::DataChannel> channel(new qtng::SocketChannel(request, qtng::NegativePole));
+        QSharedPointer<qtng::SocketChannel> channel(new qtng::SocketChannel(request, qtng::NegativePole));
         setupChannel(request, channel);
         QString address = getAddressTemplate();
         const HostAddress &peerAddress = request->peerAddress();
@@ -511,8 +512,8 @@ QSharedPointer<qtng::SocketLike> HttpTransport::createConnection(const QString &
     request.setStreamResponse(true);
     request.addHeader("Connection", "Upgrade");
     request.addHeader("Upgrade", "lafrpc");
-    session.setDnsCache(dnsCache);
-    qtng::HttpResponse response = session.send(request);
+    session->setDnsCache(dnsCache);
+    qtng::HttpResponse response = session->send(request);
     if (!response.isOk()) {
         return QSharedPointer<qtng::SocketLike>();
     }

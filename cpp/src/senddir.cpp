@@ -1,8 +1,10 @@
+#include <QtCore/qdebug.h>
 #include "../include/senddir.h"
 
 using namespace qtng;
-BEGIN_LAFRPC_NAMESPACE
 
+
+BEGIN_LAFRPC_NAMESPACE
 
 RpcDirFileEntry::RpcDirFileEntry()
     : size(0)
@@ -198,7 +200,9 @@ bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir:
 bool RpcDirPrivate::readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback)
 {
     Q_Q(RpcDir);
-    q->waitForReady();
+    if (!q->ready.wait()) {
+        return false;
+    }
     quint64 totalRead = 0;
     QByteArray buf(1024 * 64, Qt::Uninitialized);
     for (const RpcDirFileEntry &entry: entries) {

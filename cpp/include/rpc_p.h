@@ -21,6 +21,7 @@ public:
 
     bool setSslConfiguration(const qtng::SslConfiguration &config);
     bool setHttpRootDir(const QDir &rootDir);
+    bool setHttpSession(QSharedPointer<qtng::HttpSession> session);
     QList<bool> startServers(const QStringList &addresses, bool blocking);
     QList<bool> stopServers(const QStringList &addresses = QStringList());
     void shutdown();
@@ -41,6 +42,7 @@ public:
 public:
     QString myPeerName;
     quint32 maxPacketSize;
+    quint64 keepaliveTimeout;
     QMultiMap<QString, QSharedPointer<Peer>> peers;
     QSharedPointer<HeaderCallback> headerCallback;
     QSharedPointer<LoggingCallback> loggingCallback;
