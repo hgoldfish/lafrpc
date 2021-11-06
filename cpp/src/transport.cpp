@@ -563,6 +563,24 @@ QSharedPointer<qtng::BaseStreamServer> HttpTransport::createServer(const QString
 }
 
 
+bool HttpTransport::parseAddress(const QString &address, QString &host, quint16 &port)
+{
+    if (!canHandle(address)) {
+        return false;
+    }
+    QUrl u(address);
+    if (!u.isValid()) {
+        return false;
+    }
+    host = u.host();
+    if (host.isEmpty()) {
+        return false;
+    }
+    port = static_cast<quint16>(u.port(80));
+    return port > 0;
+}
+
+
 QString HttpTransport::getAddressTemplate()
 {
     return QString::fromLatin1("http://%1:%2");
@@ -573,7 +591,6 @@ bool HttpTransport::canHandle(const QString &address)
 {
     return address.startsWith("http://", Qt::CaseInsensitive);
 }
-
 
 class LafrpcHttpsServer: public SslServer<LafrpcHttpRequestHandler>
 {
@@ -600,6 +617,24 @@ QSharedPointer<qtng::BaseStreamServer> HttpsTransport::createServer(const QStrin
     server->data.rpcPath = rpcPath;
     server->data.transport = this;
     return server;
+}
+
+
+bool HttpsTransport::parseAddress(const QString &address, QString &host, quint16 &port)
+{
+    if (!canHandle(address)) {
+        return false;
+    }
+    QUrl u(address);
+    if (!u.isValid()) {
+        return false;
+    }
+    host = u.host();
+    if (host.isEmpty()) {
+        return false;
+    }
+    port = static_cast<quint16>(u.port(443));
+    return port > 0;
 }
 
 

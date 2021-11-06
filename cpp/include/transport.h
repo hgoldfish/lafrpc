@@ -37,8 +37,8 @@ protected:
                                                               QSharedPointer<qtng::SocketDnsCache> dnsCache) = 0;
     virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) = 0;
     virtual QString getAddressTemplate() = 0;
+    virtual bool parseAddress(const QString &address, QString &host, quint16 &port);
 private:
-    bool parseAddress(const QString &address, QString &host, quint16 &port);
     void setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::SocketChannel> channel);
 public:
     QMap<QByteArray, RawSocket> rawConnections;
@@ -119,6 +119,7 @@ protected:
     virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
     virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
     virtual QString getAddressTemplate() override;
+    virtual bool parseAddress(const QString &address, QString &host, quint16 &port) override;
 public:
     QSharedPointer<qtng::HttpSession> session;
     QDir rootDir;
@@ -135,6 +136,7 @@ public:
 protected:
     virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
     virtual QString getAddressTemplate() override;
+    virtual bool parseAddress(const QString &address, QString &host, quint16 &port) override;
 public:
     qtng::SslConfiguration config;
 };
