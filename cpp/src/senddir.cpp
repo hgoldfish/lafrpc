@@ -263,7 +263,7 @@ RpcDir::RpcDir(const QString &path)
     if (dirInfo.exists()) {
         d->size = static_cast<quint64>(dirInfo.size());
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
-        d->created = dirInfo.birthTime();
+        d->created = dirInfo.metadataChangeTime();
 #else
         d->created = dirInfo.created();
 #endif
@@ -306,7 +306,7 @@ static void _populate(const QDir &dir, const QString &relativePath, PopulateResu
         entry.size = static_cast<quint64>(fileInfo.size());
         entry.isdir = fileInfo.isDir();
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
-        entry.created = fileInfo.birthTime();
+        entry.created = fileInfo.metadataChangeTime();
 #else
         entry.created = fileInfo.created();
 #endif

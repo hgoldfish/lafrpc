@@ -224,7 +224,7 @@ RpcFile::RpcFile(const QString &filePath, bool withHash)
     if (fileInfo.exists()) {
         d->size = static_cast<quint64>(fileInfo.size());
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
-        d->ctime = static_cast<quint64>(fileInfo.birthTime().toMSecsSinceEpoch());
+        d->ctime = static_cast<quint64>(fileInfo.metadataChangeTime().toMSecsSinceEpoch());
 #else
         d->ctime = static_cast<quint64>(fileInfo.created().toMSecsSinceEpoch());
 #endif
