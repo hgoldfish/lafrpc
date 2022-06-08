@@ -12,6 +12,16 @@ find_package(Qt5Core CONFIG REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
 
 option(LAFRPC_BUILD_TESTS OFF)
 set(CMAKE_AUTOMOC ON)
+if (CMAKE_VERSION VERSION_LESS "3.1")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    else()
+        message(SEND_ERROR "Please update your cmake to enable c++11.")
+    endif ()
+else ()
+    set (CMAKE_CXX_STANDARD 11)
+endif ()
+
 
 set(LAFRPC_SRC
     src/peer.cpp

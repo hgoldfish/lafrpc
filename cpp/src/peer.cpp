@@ -459,9 +459,6 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
             } else {
                 QSharedPointer<qtng::SocketLike> rawSocket;
                 if (!request->rawSocket.isEmpty()) {
-                    if (!streamFromClient->preferRawSocket) {
-                        qCWarning(logger) << request->methodName << "send an raw socket, but UseSteam do not prefer raw socket.";
-                    }
                     rawSocket = rpc->takeRawSocket(name, request->rawSocket);
                     if (rawSocket.isNull()) {
                         qCWarning(logger) << request->methodName << "sent an use-stream raw socket, but it is gone.";
@@ -622,13 +619,17 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
         throw RpcRemoteException("too many arguments.");
     }
     QMetaMethod found;
-    for (int i = metaObj->methodOffset(); i < metaObj->methodCount(); ++i) {
-        const QMetaMethod &method = metaObj->method(i);
-        if (method.name() == methodName) {
-            found = method;
-            break;
+    do {
+        for (int i = metaObj->methodOffset(); i < metaObj->methodCount(); ++i) {
+            const QMetaMethod &method = metaObj->method(i);
+            if (method.name() == methodName) {
+                found = method;
+                break;
+            }
         }
-    }
+        metaObj = metaObj->superClass();
+    } while (metaObj && !found.isValid());
+
     if (!found.isValid()) {
         throw RpcRemoteException("method not found.");
     }
@@ -706,61 +707,60 @@ QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantLis
         rpc.data()->d_func()->deleteCurrentPeerAndHeader();
     }); Q_UNUSED(cleaner);
 
-    if (rpcService.type == ServiceType::FUNCTION) {
-        if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+    if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+        if (rpcService.type == ServiceType::FUNCTION) {
             this->rpc->dd_ptr->loggingCallback->calling(q, methodName, args, kwargs);
-        }
-        try {
-            const QVariant &result = rpcService.function(args, kwargs);
-            if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
-                this->rpc->dd_ptr->loggingCallback->success(q, methodName, args, kwargs, result);
-            }
-            return result;
-        } catch (...) {
-            if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
-                this->rpc->dd_ptr->loggingCallback->failed(q, methodName, args, kwargs);
-            }
-            throw;
-        }
-    } else {
-        if (l2.isEmpty()) {
-            throw RpcRemoteException();
-        }
-        const QSharedPointer<Callable> &callable = qSharedPointerDynamicCast<Callable>(rpcService.instance);
-        if (callable.isNull()) {
             try {
-                if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
-                    this->rpc->dd_ptr->loggingCallback->calling(q, methodName, args, kwargs);
-                }
-                const QVariant &result = objectCall(rpcService.instance.data(), l2[0], args, kwargs);
-                if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
-                    this->rpc->dd_ptr->loggingCallback->success(q, methodName, args, kwargs, result);
-                }
+                const QVariant &result = rpcService.function(args, kwargs);
+                this->rpc->dd_ptr->loggingCallback->success(q, methodName, args, kwargs, result);
                 return result;
             } catch (...) {
-                if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
-                    this->rpc->dd_ptr->loggingCallback->failed(q, methodName, args, kwargs);
-                }
+                this->rpc->dd_ptr->loggingCallback->failed(q, methodName, args, kwargs);
                 throw;
             }
         } else {
-            try {
-                if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+            if (l2.isEmpty()) {
+                throw RpcRemoteException();
+            }
+            const QSharedPointer<Callable> &callable = qSharedPointerDynamicCast<Callable>(rpcService.instance);
+            if (callable.isNull()) {
+                try {
                     this->rpc->dd_ptr->loggingCallback->calling(q, methodName, args, kwargs);
-                }
-                const QVariant &result = callable->call(l2[0], args, kwargs);
-                if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+                    const QVariant &result = objectCall(rpcService.instance.data(), l2[0], args, kwargs);
                     this->rpc->dd_ptr->loggingCallback->success(q, methodName, args, kwargs, result);
-                }
-                return result;
-            } catch (...) {
-                if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
+                    return result;
+                } catch (...) {
                     this->rpc->dd_ptr->loggingCallback->failed(q, methodName, args, kwargs);
+                    throw;
                 }
-                throw;
+            } else {
+                try {
+                    this->rpc->dd_ptr->loggingCallback->calling(q, methodName, args, kwargs);
+                    const QVariant &result = callable->call(l2[0], args, kwargs);
+                    this->rpc->dd_ptr->loggingCallback->success(q, methodName, args, kwargs, result);
+                    return result;
+                } catch (...) {
+                    this->rpc->dd_ptr->loggingCallback->failed(q, methodName, args, kwargs);
+                    throw;
+                }
+            }
+        }
+    } else {
+        if (rpcService.type == ServiceType::FUNCTION) {
+            return rpcService.function(args, kwargs);
+        } else {
+            if (l2.isEmpty()) {
+                throw RpcRemoteException();
+            }
+            const QSharedPointer<Callable> &callable = qSharedPointerDynamicCast<Callable>(rpcService.instance);
+            if (callable.isNull()) {
+                return objectCall(rpcService.instance.data(), l2[0], args, kwargs);
+            } else {
+                return callable->call(l2[0], args, kwargs);
             }
         }
     }
+
 }
 
 

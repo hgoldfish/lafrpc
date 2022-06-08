@@ -29,6 +29,7 @@ public:
     void close() { shutdown(); }
     bool isOk() const;   // peer is connected.
     bool isActive() const;  // is making calls
+    inline quint64 id() const { return (quint64) static_cast<const void *>(this); }
     QString name() const;
     void setName(const QString &name);
     QString address() const;

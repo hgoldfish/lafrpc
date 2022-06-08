@@ -22,6 +22,7 @@ KcpFilter::~KcpFilter() {}
 RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *parent)
     : maxPacketSize(1024 * 1024 * 64)
     , keepaliveTimeout(1000 * 20)
+    , kcpMode(qtng::KcpSocket::Internet)
     , serialization(serialization)
     , operations(new qtng::CoroutineGroup)
     , dnsCache(new qtng::SocketDnsCache())
@@ -31,12 +32,15 @@ RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *
     if (this->serialization.isNull()) {
         this->serialization.reset(new MessagePackSerialization());
     }
+
     transports.append(QSharedPointer<Transport>(new TcpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new SslTransport(parent)));
     transports.append(QSharedPointer<Transport>(new KcpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new KcpSslTransport(parent)));
     transports.append(QSharedPointer<Transport>(new HttpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new HttpsTransport(parent)));
+    transports.append(QSharedPointer<Transport>(new HttpSslTransport(parent)));
+
     registerClass<RpcRemoteException>();
     registerClass<RpcFile>();
     registerClass<RpcDir>();
@@ -55,19 +59,25 @@ bool RpcPrivate::setSslConfiguration(const qtng::SslConfiguration &config)
     bool ok = true;
     QSharedPointer<SslTransport> sslTransport = transports.at(1).dynamicCast<SslTransport>();
     if (!sslTransport.isNull()) {
-        sslTransport->config = config;
+        sslTransport->sslConfig = config;
     } else {
         ok = false;
     }
     QSharedPointer<KcpSslTransport> kcpSslTransport = transports.at(3).dynamicCast<KcpSslTransport>();
     if (!kcpSslTransport.isNull()) {
-        kcpSslTransport->config = config;
+        kcpSslTransport->sslConfig = config;
     } else {
         ok = false;
     }
     QSharedPointer<HttpsTransport> httpsTransport = transports.at(5).dynamicCast<HttpsTransport>();
     if (!httpsTransport.isNull()) {
-        httpsTransport->config = config;
+        httpsTransport->sslConfig = config;
+    } else {
+        ok = false;
+    }
+    QSharedPointer<HttpSslTransport> httpSslTransport = transports.at(6).dynamicCast<HttpSslTransport>();
+    if (!httpSslTransport.isNull()) {
+        httpSslTransport->sslConfig = config;
     } else {
         ok = false;
     }
@@ -90,6 +100,12 @@ bool RpcPrivate::setHttpRootDir(const QDir &rootDir)
     } else {
         ok = false;
     }
+    QSharedPointer<HttpSslTransport> httpSslTransport = transports.at(6).dynamicCast<HttpSslTransport>();
+    if (!httpSslTransport.isNull()) {
+        httpSslTransport->rootDir = rootDir;
+    } else {
+        ok = false;
+    }
     return ok;
 }
 
@@ -106,6 +122,12 @@ bool RpcPrivate::setHttpSession(QSharedPointer<qtng::HttpSession> session)
     QSharedPointer<HttpsTransport> httpsTransport = transports.at(5).dynamicCast<HttpsTransport>();
     if (!httpsTransport.isNull()) {
         httpsTransport->session = session;
+    } else {
+        ok = false;
+    }
+    QSharedPointer<HttpSslTransport> httpSslTransport = transports.at(6).dynamicCast<HttpSslTransport>();
+    if (!httpSslTransport.isNull()) {
+        httpSslTransport->session = session;
     } else {
         ok = false;
     }
@@ -485,6 +507,20 @@ void Rpc::setKeepaliveTimeout(float keepaliveTimeout)
 }
 
 
+qtng::KcpSocket::Mode Rpc::kcpMode() const
+{
+    Q_D(const Rpc);
+    return d->kcpMode;
+}
+
+
+void Rpc::setKcpMode(qtng::KcpSocket::Mode mode)
+{
+    Q_D(Rpc);
+    d->kcpMode = mode;
+}
+
+
 QString Rpc::myPeerName() const
 {
     Q_D(const Rpc);
@@ -735,6 +771,15 @@ RpcBuilder &RpcBuilder::kcpFilter(QSharedPointer<KcpFilter> kcpFilter)
 {
     if (!rpc.isNull()) {
         rpc->d_func()->kcpFilter = kcpFilter;
+    }
+    return *this;
+}
+
+
+RpcBuilder &RpcBuilder::kcpMode(qtng::KcpSocket::Mode kcpMode)
+{
+    if (!rpc.isNull()) {
+        rpc->d_func()->kcpMode = kcpMode;
     }
     return *this;
 }

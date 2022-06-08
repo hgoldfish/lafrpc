@@ -22,8 +22,8 @@ public:
     bool writeToPath(const QString &path, ProgressCallback progressCallback = nullptr);
     bool readFromPath(const QString &path, ProgressCallback progressCallback = nullptr);
     bool readFromPath(ProgressCallback progressCallback = nullptr);
-    bool writeTo(QFile &f, ProgressCallback progressCallback = nullptr);
-    bool readFrom(QFile &f, ProgressCallback progressCallback = nullptr);
+    bool writeTo(QSharedPointer<qtng::FileLike> f, ProgressCallback progressCallback = nullptr);
+    bool readFrom(QSharedPointer<qtng::FileLike> f, ProgressCallback progressCallback = nullptr);
 
     bool sendall(const QByteArray &data, ProgressCallback progressCallback = nullptr);
     bool recvall(QByteArray &data, ProgressCallback progressCallback = nullptr);

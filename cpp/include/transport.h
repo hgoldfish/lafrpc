@@ -74,7 +74,7 @@ protected:
     virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
     virtual QString getAddressTemplate() override;
 public:
-    qtng::SslConfiguration config;
+    qtng::SslConfiguration sslConfig;
 };
 
 
@@ -104,7 +104,7 @@ protected:
     virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
     virtual QString getAddressTemplate() override;
 public:
-    qtng::SslConfiguration config;
+    qtng::SslConfiguration sslConfig;
 };
 
 
@@ -138,7 +138,23 @@ protected:
     virtual QString getAddressTemplate() override;
     virtual bool parseAddress(const QString &address, QString &host, quint16 &port) override;
 public:
-    qtng::SslConfiguration config;
+    qtng::SslConfiguration sslConfig;
+};
+
+
+class HttpSslTransport: public HttpTransport
+{
+public:
+    explicit HttpSslTransport(QPointer<Rpc> rpc)
+        : HttpTransport(rpc) {}
+public:
+    virtual bool canHandle(const QString &address) override;
+protected:
+    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QString getAddressTemplate() override;
+public:
+    qtng::SslConfiguration sslConfig;
 };
 
 END_LAFRPC_NAMESPACE
