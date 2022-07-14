@@ -67,11 +67,8 @@ bool Transport::startServer(const QString &address)
 }
 
 
-QSharedPointer<qtng::DataChannel> Transport::connect(const QString &address, float timeout)
+QSharedPointer<qtng::DataChannel> Transport::connect(const QString &address)
 {
-    if (timeout == 0.0f) {
-        timeout = 5.0f;
-    }
     QString host;
     quint16 port;
     bool valid = parseAddress(address, host, port);
@@ -272,7 +269,7 @@ QSharedPointer<qtng::BaseStreamServer> SslTransport::createServer(const QString 
 
 bool SslTransport::canHandle(const QString &address)
 {
-    return address.startsWith("ssl://", Qt::CaseInsensitive);
+    return address.startsWith("ssl://", Qt::CaseInsensitive) || address.startsWith("ssl+tcp://", Qt::CaseInsensitive);
 }
 
 
