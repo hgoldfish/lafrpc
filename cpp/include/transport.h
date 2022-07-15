@@ -26,7 +26,7 @@ public:
     explicit Transport(QPointer<Rpc> rpc);
     virtual ~Transport();
 public:
-    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address, float timeout = 0.0f);
+    virtual QSharedPointer<qtng::DataChannel> connect(const QString &address);
     virtual bool startServer(const QString &address);
     virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray &connectionId);
     virtual QSharedPointer<qtng::SocketLike> takeRawSocket(const QByteArray &connectionId);
