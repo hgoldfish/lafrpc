@@ -68,13 +68,13 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         request->header = l[5].toMap();
         request->channel = static_cast<quint32>(l[6].toLongLong(&ok));
         request->rawSocket = l[7].toByteArray();
-        if(ok) {
+        if (ok) {
             return GOT_REQUEST;
         } else {
             return GOT_NOTHING;
         }
     } else if (l.size() == 6) {
-        if(l[0].toInt(&ok) != 2) {
+        if (l[0].toInt(&ok) != 2) {
             return GOT_NOTHING;
         }
         response->id = l[1].toByteArray();
@@ -82,7 +82,7 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         response->exception = l[3];
         response->channel = static_cast<quint32>(l[4].toLongLong(&ok));
         response->rawSocket = l[5].toByteArray();
-        if(ok) {
+        if (ok) {
             return GOT_RESPONSE;
         } else {
             return GOT_NOTHING;

@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 project(lafrpc)
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../qtnetworkng/qtnetworkng.h")
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../qtnetworkng/" qtnetworkng)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../qtnetworkng/" qtnetworkng EXCLUDE_FROM_ALL)
 else()
-    add_subdirectory(qtnetworkng)
+    add_subdirectory(qtnetworkng qtnetworkng EXCLUDE_FROM_ALL)
 endif()
 
 find_package(Qt5Core CONFIG REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
