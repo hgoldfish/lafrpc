@@ -366,9 +366,9 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
     QVariantMap myHeader;
     myHeader.insert(QString::fromUtf8("peer_name"), myPeerName);
     myHeader.insert(QString::fromUtf8("version"), PEER_VERSION);
-    const QByteArray data = serialization->pack(myHeader);
+    const QByteArray &data = serialization->pack(myHeader);
     if (data.isNull()) {
-        qCWarning(logger) << "can not encrypt connection header.";
+        qCWarning(logger) << "can not serialize connection header.";
         return empty;
     }
 #ifdef DEUBG_RPC_PROTOCOL

@@ -210,7 +210,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     bool success;
 
     if (broken || rpc.isNull()) {
-        throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+        throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
     }
 
     QSharedPointer<UseStream> streamFromClient;
@@ -244,18 +244,18 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     request.kwargs = kwargs;
     if (!rpc->dd_ptr->headerCallback.isNull()) {
         request.header = rpc->dd_ptr->headerCallback->make(q, methodName);
-        if(broken || rpc.isNull()) {
-            throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+        if (broken || rpc.isNull()) {
+            throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
         }
     }
 
     if (!streamFromClient.isNull()) {
         QSharedPointer<qtng::VirtualChannel> subChannelFromClient = channel->makeChannel();
         if (subChannelFromClient.isNull()) {
-            throw RpcDisconnectedException(QStringLiteral("can not make sub channel."));
+            throw RpcDisconnectedException(QString::fromUtf8("can not make sub channel."));
         }
         if(broken || rpc.isNull()) {
-            throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+            throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
         }
         QByteArray connectionId;
         QSharedPointer<qtng::SocketLike> rawSocket;
@@ -265,7 +265,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
                 qCDebug(logger) << "can not make raw socket to" << name;
             }
             if(broken || rpc.isNull()) {
-                throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+                throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
             }
         }
         streamFromClient->place = UseStream::ClientSide | UseStream::ParamInRequest;
@@ -277,10 +277,10 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
     QByteArray requestBytes = packRequest(rpc.data()->serialization(), request);
     if (requestBytes.isEmpty()) {
-        throw RpcSerializationException(QStringLiteral("can not serialize request while calling remote method: %1").arg(methodName));
+        throw RpcSerializationException(QString::fromUtf8("can not serialize request while calling remote method: %1").arg(methodName));
     }
     if (broken || rpc.isNull()) {
-        throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+        throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
     }
 
     QSharedPointer<Waiter> waiter(new Waiter());
@@ -289,11 +289,11 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     success = channel->sendPacket(requestBytes);
     if (!success) {
         shutdown();
-        throw RpcDisconnectedException("can not send packet.");
+        throw RpcDisconnectedException(QString::fromUtf8("can not send packet."));
     }
 
     if (broken || rpc.isNull()) {
-        throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+        throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
     }
 
     if (!streamFromClient.isNull()) {
@@ -310,19 +310,22 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     } catch(RpcException &) {
         waiters.remove(request.id);
         throw;
+    } catch (qtng::Timeout &e) {
+        waiters.remove(request.id);
+        throw;
     } catch (...) {
         waiters.remove(request.id);
-        const QString &message = QStringLiteral("unknown error occurs while waiting response of remote method: `%1`").arg(methodName);
+        const QString &message = QString::fromUtf8("unknown error occurs while waiting response of remote method: `%1`").arg(methodName);
         throw RpcInternalException(message);
     }
 
     if (response.isNull() || !response->isOk()) {
-        const QString &message = QStringLiteral("got empty response while waiting response of remote method: `%1`").arg(methodName);
+        const QString &message = QString::fromUtf8("got empty response while waiting response of remote method: `%1`").arg(methodName);
         throw RpcDisconnectedException(message);
     }
 
     if (broken || rpc.isNull()) {
-        throw RpcDisconnectedException(QStringLiteral("rpc is gone."));
+        throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
     }
 
     if (!response->exception.isNull()) {
@@ -674,7 +677,7 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
 
     int rtype = metaTypeOf(found.typeName());
     if (!rtype) {
-        throw RpcRemoteException(QStringLiteral("unknown return type: %1").arg(found.typeName()));
+        throw RpcRemoteException(QString::fromUtf8("unknown return type: %1").arg(found.typeName()));
     }
     QVariant rvalue(rtype, QMetaType::create(rtype));
     QGenericReturnArgument rarg(found.typeName(), rvalue.data());

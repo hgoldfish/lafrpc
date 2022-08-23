@@ -37,7 +37,7 @@ private:
 
 
 RpcFilePrivate::RpcFilePrivate(RpcFile *q)
-    :size(0), atime(0), mtime(0), ctime(0), q_ptr(q) {}
+    : size(0), atime(0), mtime(0), ctime(0), q_ptr(q) {}
 
 
 
@@ -53,7 +53,7 @@ bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
     quint64 count = 0;
     char buf[BLOCK_SIZE];
     if (progressCallback) {
-        while(count < size) {
+        while (count < size) {
             qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
             if (readBytes < 0) {
                 qCWarning(logger) << "rpc file read error.";
@@ -77,7 +77,7 @@ bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
             }
         }
     } else {
-        while(count < size) {
+        while (count < size) {
             qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
             if (readBytes < 0) {
                 qCWarning(logger) << "rpc file read error.";
@@ -112,7 +112,7 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
     QCryptographicHash hasher(QCryptographicHash::Sha256);
     const bool doHash = !hash.isEmpty();
     if (progressCallback) {
-        while(count < size) {
+        while (count < size) {
             const QByteArray &buf = q->channel->recvPacket();
             if (buf.isEmpty()) {
                 qCWarning(logger) << "rpc file receiving error.";
@@ -140,7 +140,7 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
         }
     } else {
         // remove the calling of progressCallback
-        while(count < size) {
+        while (count < size) {
             const QByteArray &buf = q->channel->recvPacket();
             if (buf.isEmpty()) {
                 qCWarning(logger) << "rpc file receiving error.";
@@ -183,7 +183,7 @@ bool RpcFilePrivate::sendfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::P
     quint64 count = 0;
     char buf[BLOCK_SIZE];
     if (progressCallback) {
-        while(count < size) {
+        while (count < size) {
             qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
             if (readBytes < 0) {
                 qCWarning(logger) << "rpc file read error.";
@@ -229,7 +229,7 @@ bool RpcFilePrivate::recvfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::P
     QCryptographicHash hasher(QCryptographicHash::Sha256);
     const bool doHash = !hash.isEmpty();
     if (progressCallback) {
-        while(count < size) {
+        while (count < size) {
             const QByteArray &buf = q->rawSocket->recv(1024);
             if (buf.isEmpty()) {
                 qCWarning(logger) << "rpc file receiving error.";

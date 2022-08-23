@@ -235,7 +235,6 @@ QSharedPointer<qtng::BaseStreamServer> TcpTransport::createServer(const QString 
 }
 
 
-
 QString TcpTransport::getAddressTemplate()
 {
     return QStringLiteral("tcp://%1:%2");
