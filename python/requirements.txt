@@ -1,0 +1,4 @@
+eventlet==0.21.0
+gevent==1.2.2
+greenlet==0.4.12
+qdatastream==0.1.2
