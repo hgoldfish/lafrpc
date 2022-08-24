@@ -8,6 +8,8 @@
 
 static Q_LOGGING_CATEGORY(logger, "lafrpc.peer")
 
+// #define DEUBG_RPC_PROTOCOL
+
 BEGIN_LAFRPC_NAMESPACE
 
 inline QByteArray packRequest(const QSharedPointer<Serialization> &serialization, const Request &request)
@@ -59,6 +61,9 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
     bool ok;
     if(l.size() == 8) {
         if(l[0].toInt(&ok) != 1) {
+#ifdef DEUBG_RPC_PROTOCOL
+            qCDebug(logger) << "the first byte of request is not the number 1.";
+#endif
             return GOT_NOTHING;
         }
         request->id = l[1].toByteArray();
@@ -71,10 +76,16 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         if (ok) {
             return GOT_REQUEST;
         } else {
+#ifdef DEUBG_RPC_PROTOCOL
+            qCDebug(logger) << "got invalid request:" << l;
+#endif
             return GOT_NOTHING;
         }
     } else if (l.size() == 6) {
         if (l[0].toInt(&ok) != 2) {
+#ifdef DEUBG_RPC_PROTOCOL
+            qCDebug(logger) << "the first byte of request is not the number 2.";
+#endif
             return GOT_NOTHING;
         }
         response->id = l[1].toByteArray();
@@ -85,6 +96,9 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         if (ok) {
             return GOT_RESPONSE;
         } else {
+#ifdef DEUBG_RPC_PROTOCOL
+            qCDebug(logger) << "got invalid response:" << l;
+#endif
             return GOT_NOTHING;
         }
     }
@@ -421,11 +435,16 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
     if (!rpc->dd_ptr->headerCallback.isNull()) {
         bool success = rpc->dd_ptr->headerCallback->auth(q, request->methodName, request->header);
         if (!success) {
+#ifdef DEUBG_RPC_PROTOCOL
             qCDebug(logger) << "invalid packet from" << name;
+#endif
             return;
         }
     }
     if (broken || rpc.isNull()) {
+#ifdef DEUBG_RPC_PROTOCOL
+            qCDebug(logger) << "rpc is gone where handling request.";
+#endif
         return;
     }
 
@@ -484,10 +503,15 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
             throw;
         } catch (RpcRemoteException &e) {
             response.exception = e.clone();
+#ifdef DEUBG_RPC_PROTOCOL
             qCDebug(logger) << e.what();
+#endif
         } catch (...) {
             QSharedPointer<RpcRemoteException> e(new RpcRemoteException("unknown exception caught."));
             response.exception.setValue(e);
+#ifdef DEUBG_RPC_PROTOCOL
+            qCDebug(logger) << "unknown exception caught while lookup and call request method:" << request->methodName << request->args << request->kwargs << request->header;
+#endif
         }
         if (broken || rpc.isNull()) {
             return;

@@ -10,7 +10,7 @@ static Q_LOGGING_CATEGORY(logger, "lafrpc.rpc")
 
 #define PEER_VERSION 1
 #define KEY_SIZE 64
-//#define DEUBG_RPC_PROTOCOL
+// #define DEUBG_RPC_PROTOCOL
 
 BEGIN_LAFRPC_NAMESPACE
 
