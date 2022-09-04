@@ -4,6 +4,7 @@ import weakref
 import socket
 import uuid
 import time
+from enum import Enum
 from typing import Dict
 
 from lafrpc.scheduler import BaseScheduler
@@ -13,6 +14,8 @@ __all__ = ["DataChannel", "SocketDataChannel", "VirtualDataChannel"]
 logger = logging.getLogger(__name__)
 
 debug_protocol = False
+
+DefaultPacketSize = 1024 * 4
 
 
 def recvall(connection, size):
@@ -91,13 +94,32 @@ def unpack_command(bs):
         return None
 
 
+class ChannelError(Enum):
+    RemotePeerClosedError = (1, "The remote peer closed the connection")
+    KeepaliveTimeoutError = (2, "The remote peer didn't send keepalive packet for a long time.")
+    ReceivingError = (3, "Can not receive packet from remote peer")
+    SendingError = (4, "Can not send packet to remote peer.")
+    InvalidCommand = (5, "Can not parse packet header.")
+    InvalidPacket = (6, "Can not parse command or unknown command.")
+    UserShutdown = (7, "Programmer shutdown channel manually.")
+    PluggedChannelError = (8, "The plugged channel has error.")
+    PakcetTooLarge = (9, "The packet is too large.")
+
+    UnknownError = (100, "Caught unknown error.")
+    ProgrammingError = (101, "The QtNetwork programmer do a stupid thing.")
+    NoError = (0, "")
+
+    def __init__(self, code, description):
+        self.code, self.description = code, description
+
+
 class DataChannel:
     PositivePole = 1
     NegativePole = -1
     DataChannelNumber = 1
     CommandChannelNumber = 0
 
-    def __init__(self, pole, io_scheduler: BaseScheduler):
+    def __init__(self, pole: int, io_scheduler: BaseScheduler):
         self.channels: Dict[int, weakref.ref] = {}
         assert pole in (DataChannel.PositivePole, DataChannel.NegativePole)
         self.pole = pole
@@ -105,7 +127,7 @@ class DataChannel:
             self.next_channel_number = 2
         else:
             self.next_channel_number = 2 ** 32 - 1
-        self.broken = False
+        self.error: ChannelError = ChannelError.NoError
         self.pending_channels = io_scheduler.Queue()
         self.receiving_queue = io_scheduler.Queue()
         self.capacity = 0xff
@@ -113,48 +135,34 @@ class DataChannel:
         self.go_through.set()
         self.io_scheduler = io_scheduler
         self.lock = io_scheduler.Lock()
-
-        self._max_packet_size = 1024 * 64
-        self._payload_size_hint = 1400
         self._name = ""
 
-    def __repr__(self):
-        pattern = "<{2} (name = {0}, state = {1})>, "
-        if not self.broken:
-            state = "ok"
-        else:
-            state = "closed"
-        return pattern.format(self._name, state, self.__class__.__name__)
+    def __repr__(self) -> str:
+        pattern = "<{0} (name = {1}, error = {2})>, "
+        return pattern.format(self.__class__.__name__, self._name, self.error.description)
 
     @property
-    def header_size(self):
+    def header_size(self) -> int:
         raise NotImplementedError()
 
     @property
-    def max_packet_size(self):
-        return self._max_packet_size
-
-    @max_packet_size.setter
-    def max_packet_size(self, max_packet_size):
-        with self.lock:
-            self._max_packet_size = max_packet_size
-            self._payload_size_hint = min(self._payload_size_hint, max_packet_size - self.header_size)
+    def max_packet_size(self) -> int:
+        raise NotImplementedError()
 
     @property
-    def payload_size_hint(self):
-        return self._payload_size_hint
-
-    @payload_size_hint.setter
-    def payload_size_hint(self, payload_size_hint):
-        with self.lock:
-            self._payload_size_hint = min(payload_size_hint, self._max_packet_size - self.header_size)
+    def max_payload_size(self) -> int:
+        raise NotImplementedError()
 
     @property
-    def name(self):
+    def payload_size_hint(self) -> int:
+        raise NotImplementedError()
+
+    @property
+    def name(self) -> str:
         return self._name
 
     @name.setter
-    def name(self, name):
+    def name(self, name: str):
         with self.lock:
             self._name = name
 
@@ -167,7 +175,7 @@ class DataChannel:
         self._put_packet_in_sending_queue(DataChannel.CommandChannelNumber, packet)
         return channel
 
-    def take_channel(self, channel_number=None):
+    def take_channel(self, channel_number: int=None):
         if not self.is_ok():
             return None
         if channel_number is None:
@@ -187,7 +195,7 @@ class DataChannel:
 
     def recv_packet(self) -> bytes:
         with self.lock:
-            if self.receiving_queue.empty() and self.broken:
+            if self.receiving_queue.empty() and self.error != ChannelError.NoError:
                 raise IOError()
         packet = self.receiving_queue.get()
         if isinstance(packet, IOError):
@@ -195,10 +203,10 @@ class DataChannel:
             raise packet
         if self.receiving_queue.qsize() == (self.capacity - 1):
             command = pack_go_through_request()
-            self._put_packet_in_sending_queue(0, command)
+            self._put_packet_in_sending_queue(DataChannel.CommandChannelNumber, command)
         return packet
 
-    def send_packet(self, packet) -> None:
+    def send_packet(self, packet: bytes):
         with self.lock:
             if len(packet) > self.max_packet_size:
                 logger.debug("packet size is too large than {}".format(self.max_packet_size))
@@ -206,7 +214,7 @@ class DataChannel:
         self.go_through.wait()
         self._send_packet(DataChannel.DataChannelNumber, packet)
 
-    def send_packet_async(self, packet) -> None:
+    def send_packet_async(self, packet: bytes):
         with self.lock:
             if len(packet) > self.max_packet_size:
                 logger.debug("packet size is too large than {}".format(self.max_packet_size))
@@ -222,7 +230,7 @@ class DataChannel:
                 self._put_packet_in_sending_queue(DataChannel.CommandChannelNumber, command)
             self.receiving_queue.put(payload)
         else:
-            channel = None
+            channel: DataChannel = None
             with self.lock:
                 if channel_number in self.channels:
                     channel = self.channels[channel_number]()
@@ -242,11 +250,11 @@ class DataChannel:
                     logger.error("can not unpack channel's packet header.")
                     return False
                 if not channel._handle_incoming_packet(channel_number, packet):
-                    channel.close()
+                    channel.close(ChannelError.InvalidPacket)
                     return False
         return True
 
-    def _handle_command(self, packet):
+    def _handle_command(self, packet: bytes) -> bool:
         # noinspection PyBroadException
         try:
             command = unpack_command(packet)
@@ -265,9 +273,10 @@ class DataChannel:
                 if debug_protocol:
                     logger.debug("对端发来提醒，虚拟通道已经创建完毕: %d", channel_number)
                 with self.lock:
-                    if channel_number not in self.channels:
+                    try:
+                        channel = self.channels[channel_number]()
+                    except KeyError:
                         return True
-                    channel = self.channels[channel_number]()
                 if channel is None:
                     del self.channels[channel_number]
                     self._notify_channel_closed(channel_number)
@@ -276,12 +285,14 @@ class DataChannel:
                 if debug_protocol:
                     logger.debug("对端要求关闭虚拟通道，号码是: %d", channel_number)
                 self.take_channel(channel_number)
-                if channel_number in self.channels:
-                    self._clean_channel(channel_number, send_destroy_packet=False)
+                try:
                     channel = self.channels[channel_number]()
-                    if channel is not None:
-                        channel._parent = None
-                        channel.close()
+                except KeyError:
+                    return True
+                if channel is not None:
+                    self._clean_channel(channel_number, send_destroy_packet=False)
+                    channel._parent = None
+                    channel.close(ChannelError.RemotePeerClosedError)
             elif command["command"] == SLOW_DOWN_REQUEST:
                 if debug_protocol:
                     logger.debug("对端要求减速。")
@@ -302,16 +313,14 @@ class DataChannel:
             return False
         return True
 
-    def _notify_channel_closed(self, channel_number):
-        if self.broken:
+    def _notify_channel_closed(self, channel_number: int):
+        if self.error != ChannelError.NoError:
             return
         command = pack_destroy_channel_request(channel_number)
         self._put_packet_in_sending_queue(0, command)
 
     def _make_channel(self, channel_number: int, pole: int):
         channel = VirtualDataChannel(self, channel_number, pole, self.io_scheduler)
-        channel._max_packet_size = self._max_packet_size - 4
-        channel._payload_size_hint = self._payload_size_hint - 4
         channel.capacity = self.capacity
         self.channels[channel_number] = weakref.ref(channel, _CleanChannelHelper(self))
         return channel
@@ -321,12 +330,12 @@ class DataChannel:
 
     # noinspection PyUnusedLocal
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        self.close(ChannelError.UserShutdown)
 
     def is_ok(self):
-        return not self.broken
+        return self.error == ChannelError.NoError
 
-    def close(self):
+    def close(self, reason: ChannelError):
         for i in range(self.receiving_queue.getting()):
             self.receiving_queue.put(IOError())
         for i in range(self.pending_channels.getting()):
@@ -338,21 +347,21 @@ class DataChannel:
                 channel = ref()
                 if channel is not None:
                     channel._parent = None
-                    channel.close()
+                    channel.close(reason)
 
     def get_peer_address(self):
         raise NotImplementedError()
 
-    def _send_packet(self, channel_number, packet):
+    def _send_packet(self, channel_number: int, packet: bytes):
         raise NotImplementedError()
 
-    def _put_packet_in_sending_queue(self, channel_number, packet):
+    def _put_packet_in_sending_queue(self, channel_number: int, packet: bytes):
         raise NotImplementedError()
 
-    def _clean_channel(self, channel_number, send_destroy_packet):
+    def _clean_channel(self, channel_number: int, send_destroy_packet: bool):
         raise NotImplementedError()
 
-    def _clean_sending_packet(self, channel_number, check_packet):
+    def _clean_sending_packet(self, channel_number: int, check_packet):
         raise NotImplementedError()
 
 
@@ -366,6 +375,8 @@ class SocketDataChannel(DataChannel):
             pass
         self.sending_queue = io_scheduler.Queue()
         self.name = str(uuid.uuid4())
+        self._max_payload_size = 1024 * 64 - 8
+        self._payload_size_hint = 1400
         self._keepalive_timeout = 10 * 1000
         self._keepalive_interval = 2 * 1000
         io_scheduler.spawn_with_name("sending-{0}".format(self.name), self._do_send)
@@ -375,8 +386,36 @@ class SocketDataChannel(DataChannel):
         self.last_active_timestamp = int(time.time() * 1000)
 
     @property
-    def header_size(self):
+    def header_size(self) -> int:
         return 8
+
+    @property
+    def max_packet_size(self) -> int:
+        return self._max_payload_size + 8
+
+    @max_packet_size.setter
+    def max_packet_size(self, size: int):
+        if size <= 0:
+            size = DefaultPacketSize
+        elif size < 64:
+            logger.warning("the max packet size of DataChannel should not lesser than 64.")
+            return
+        with self.lock:
+            self._max_payload_size = size - 8
+            self._payload_size_hint = min(self._payload_size_hint, self._max_payload_size)
+
+    @property
+    def max_payload_size(self) -> int:
+        return self._max_payload_size
+
+    @property
+    def payload_size_hint(self) -> int:
+        return self._payload_size_hint
+
+    @payload_size_hint.setter
+    def payload_size_hint(self, payload_size_hint: int):
+        with self.lock:
+            self._payload_size_hint = min(payload_size_hint, self._max_payload_size)
 
     @property
     def keepalive_timeout(self):
@@ -400,11 +439,11 @@ class SocketDataChannel(DataChannel):
         except socket.error:
             raise IOError()
 
-    def close(self):
+    def close(self, reason=ChannelError.UserShutdown):
         with self.lock:
-            if self.broken:
+            if self.error != ChannelError.NoError:
                 return
-            self.broken = True
+            self.error = reason
         try:
             self.connection.close()
         except socket.error:
@@ -421,12 +460,12 @@ class SocketDataChannel(DataChannel):
             self.io_scheduler.kill("receiving-{0}".format(self.name))
         if self.io_scheduler.get("keepalive-{0}".format(self.name)) is not current:
             self.io_scheduler.kill("keepalive-{0}".format(self.name))
-        super(SocketDataChannel, self).close()
+        super(SocketDataChannel, self).close(reason)
 
     def _send_packet(self, channel_number, packet):
         assert isinstance(packet, bytes), "the type of packet must be bytes."
         with self.lock:
-            if self.broken:
+            if self.error != ChannelError.NoError:
                 raise IOError()
         done = self.io_scheduler.Event()
         self.sending_queue.put((channel_number, packet, done))
@@ -436,7 +475,7 @@ class SocketDataChannel(DataChannel):
 
     def _put_packet_in_sending_queue(self, channel_number, packet):
         with self.lock:
-            if self.broken:
+            if self.error != ChannelError.NoError:
                 return False
         self.sending_queue.put((channel_number, packet, None))
 
@@ -447,13 +486,14 @@ class SocketDataChannel(DataChannel):
             except self.io_scheduler.Exit:
                 if debug_protocol:
                     logger.debug("等待发送队列数据到达前线程退出。")
-                return self.close()
-            if self.broken:
+                assert self.error != ChannelError.NoError
+                return
+            if self.error != ChannelError.NoError:
                 if debug_protocol:
                     logger.debug("连接已经关闭。直接报告错误。通道号是%d。", channel_number)
                 if done:
                     done.send_exception(IOError())
-                return self.close()
+                return
             # noinspection PyBroadException
             try:
                 header = struct.pack(b"!II", len(packet), channel_number)
@@ -465,68 +505,73 @@ class SocketDataChannel(DataChannel):
                 # 以前这里和别的地方不一样，如果done is None，忽略socket错误。 if done: continue，但是后来我不明白为啥这样写。
                 if done:
                     done.send_exception(IOError(e))
-                return self.close()
+                return self.close(ChannelError.SendingError)
             except self.io_scheduler.Exit as e:
                 if debug_protocol:
                     logger.debug("写数据时线程退出。")
                 if done:
                     done.send_exception(IOError(e))
-                return self.close()
+                assert self.error != ChannelError.NoError
+                return
             except Exception as e:
                 if done:
                     done.send_exception(IOError(e))
                 logger.exception("写数据时发生其它错误。")
-                return self.close()
+                return self.close(ChannelError.UnknownError)
             if done:
                 done.send(True)
-            self.last_active_timestamp = time.time() * 1000
+            self.last_keepalive_timestamp = int(time.time() * 1000)
 
     def _do_receive(self):
         st = struct.Struct("!II")
         header_size = st.size
         while True:
+            # noinspection PyBroadException
             try:
                 header = recvall(self.connection, header_size)
-                packet_size, channel_number = st.unpack(header)
-                if packet_size > self._max_packet_size:
-                    logger.error("packet_size %d is larger than %d", packet_size, self._max_packet_size)
-                    return self.close()
-                packet = recvall(self.connection, packet_size)
-                if len(packet) != packet_size:
-                    logger.error("接收数据时提前结束。")
-                    return self.close()
+                payload_size, channel_number = st.unpack(header)
+                if payload_size > self._max_payload_size:
+                    logger.error("packet_size %d is larger than %d", payload_size, self._max_payload_size)
+                    return self.close(ChannelError.PakcetTooLarge)
+                payload = recvall(self.connection, payload_size)
+            except (socket.error, IOError, OSError):
                 if debug_protocol:
-                    logger.debug("received packet: %d", header_size + len(packet))
-            except (socket.error, IOError):
-                if debug_protocol:
-                    logger.debug("can not receive socket channel packet.")
-                return self.close()
+                    logger.info("can not receive socket channel packet.")
+                return self.close(ChannelError.ReceivingError)
             except self.io_scheduler.Exit:
                 if debug_protocol:
                     logger.debug("coroutine exit while receiving channel packet.")
-                return self.close()
-            except:
-                logger.exception("接收数据时抛出未知异常。")
-                return self.close()
+                assert self.error != ChannelError.NoError
+                return
+            except Exception:
+                logger.exception("caugth unexpected exception while receiving data channel packets.")
+                return self.close(ChannelError.UnknownError)
 
-            if not self._handle_incoming_packet(channel_number, packet):
+            if len(payload) != payload_size:
+                if debug_protocol:
+                    logger.debug("the connection is closed.")
+                return self.close(ChannelError.ReceivingError)
+            if debug_protocol:
+                logger.debug("received packet: %d", header_size + len(payload))
+
+            if not self._handle_incoming_packet(channel_number, payload):
                 if debug_protocol:
                     logger.debug("can not handle incoming packet.")
-                return self.close()
+                return self.close(ChannelError.InvalidCommand)
             self.last_active_timestamp = int(time.time() * 1000)
 
     def _do_keepalive(self):
         while True:
             self.io_scheduler.sleep(1.0)
-            if not self._keepalive_timeout:
-                return
             now = int(time.time() * 1000)
             if now - self.last_active_timestamp > self._keepalive_timeout:
                 if debug_protocol:
                     logger.debug("socket channel is timeouted: %d", now - self.last_active_timestamp)
-                self.close()
+                self.close(ChannelError.KeepaliveTimeoutError)
                 return
-            if now > self.last_keepalive_timestamp and now - self.last_keepalive_timestamp > self._keepalive_interval:
+            if now - self.last_keepalive_timestamp > self._keepalive_interval:
+                # 虽然在 do_send() 时会更新，但是不一定发送成功。一旦发送不成功，就会往 sending_queue 里面堆太多 keepalive_request
+                # 另一个更好的办法检测 sending_queue 的大小，在 cpp 版本里面就是这么干的。
                 self.last_keepalive_timestamp = now
                 self._put_packet_in_sending_queue(DataChannel.CommandChannelNumber, pack_keepalive_request())
 
@@ -560,26 +605,48 @@ class VirtualDataChannel(DataChannel):
         # TODO connect parent's disconnected to self.close
 
     def __del__(self):
-        self.close()
+        self.close(ChannelError.UserShutdown)
 
     @property
     def header_size(self):
         return 4
 
-    def close(self):
+    @property
+    def max_packet_size(self) -> int:
+        if not self._parent:
+            return 1400
+        else:
+            return self._parent.max_payload_size
+
+    @property
+    def max_payload_size(self) -> int:
+        if not self._parent:
+            return 1400
+        else:
+            return self._parent.max_payload_size - 4
+
+    @property
+    def payload_size_hint(self) -> int:
+        if not self._parent:
+            return 1400
+        else:
+            return self._parent.payload_size_hint - 4
+
+    def close(self, reason=ChannelError.UserShutdown):
         with self.lock:
-            if self.broken:
+            if self.error != ChannelError.NoError:
                 return
-            self.broken = True
+            self.error = reason
 
         for i in range(self.receiving_queue.getting()):
             self.receiving_queue.put(IOError())
         if self._parent:
             self._parent._clean_channel(self.channel_number, True)
+        super(VirtualDataChannel, self).close(reason)
 
     def is_ok(self):
         with self.lock:
-            return not self.broken and self._parent is not None and self._parent.is_ok()
+            return self.error == ChannelError.NoError and self._parent is not None and self._parent.is_ok()
 
     def get_peer_adddress(self):
         if self._parent:
@@ -630,4 +697,3 @@ class VirtualDataChannel(DataChannel):
             return
         packet = struct.pack("!I", channel_number) + packet
         self._parent._put_packet_in_sending_queue(self.channel_number, packet)
-

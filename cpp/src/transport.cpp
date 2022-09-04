@@ -58,7 +58,7 @@ bool Transport::startServer(const QString &address)
         host = l.first();
     }
 
-    QSharedPointer<qtng::BaseStreamServer> server = createServer(address, host, port);
+    QSharedPointer<BaseStreamServer> server = createServer(address, host, port);
     if (server.isNull()) {
         qCWarning(logger) << "can not create server for" << address;
         return false;
@@ -67,41 +67,41 @@ bool Transport::startServer(const QString &address)
 }
 
 
-QSharedPointer<qtng::DataChannel> Transport::connect(const QString &address)
+QSharedPointer<DataChannel> Transport::connect(const QString &address)
 {
     QString host;
     quint16 port;
     bool valid = parseAddress(address, host, port);
     if (!valid) {
         qCWarning(logger) << address << "is invalid url.";
-        return QSharedPointer<qtng::DataChannel>();
+        return QSharedPointer<DataChannel>();
     }
 
     QSharedPointer<SocketLike> request = createConnection(address, host, port, RpcPrivate::getPrivateHelper(rpc.data())->dnsCache);
     if (request.isNull()) {
-        return QSharedPointer<qtng::DataChannel>();
+        return QSharedPointer<DataChannel>();
     }
 
-    request->setOption(qtng::Socket::LowDelayOption, true);
+    request->setOption(Socket::LowDelayOption, true);
     qint64 sentBytes = request->sendall("\x4e\x67");
     if (sentBytes != 2) {
         qCDebug(logger) << "handshaking is failed in client side.";
-        return QSharedPointer<qtng::DataChannel>();
+        return QSharedPointer<DataChannel>();
     }
-    QSharedPointer<qtng::SocketChannel> channel(new qtng::SocketChannel(request, qtng::PositivePole));
+    QSharedPointer<SocketChannel> channel(new SocketChannel(request, PositivePole));
     setupChannel(request, channel);
     return channel;
 }
 
 
-QSharedPointer<qtng::SocketLike> Transport::makeRawSocket(const QString &address, QByteArray &connectionId)
+QSharedPointer<SocketLike> Transport::makeRawSocket(const QString &address, QByteArray &connectionId)
 {
     QString host;
     quint16 port;
     bool valid = parseAddress(address, host, port);
     if (!valid) {
         qCWarning(logger) << address << "is invalid url.";
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
 
     QSharedPointer<SocketLike> request = createConnection(address, host, port, RpcPrivate::getPrivateHelper(rpc.data())->dnsCache);
@@ -116,11 +116,11 @@ QSharedPointer<qtng::SocketLike> Transport::makeRawSocket(const QString &address
     if (sentBytes != packet.size()) {
         connectionId.clear();
         qCDebug(logger) << "handshaking is failed in client side.";
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
     if (request->recvall(2) != "\xf3\x97") {
         connectionId.clear();
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     } else {
         qCDebug(logger) << "raw socket handshake finished.";
     }
@@ -128,14 +128,14 @@ QSharedPointer<qtng::SocketLike> Transport::makeRawSocket(const QString &address
 }
 
 
-QSharedPointer<qtng::SocketLike> Transport::takeRawSocket(const QByteArray &connectionId)
+QSharedPointer<SocketLike> Transport::takeRawSocket(const QByteArray &connectionId)
 {
     const RawSocket &rawConnection = rawConnections[connectionId];
     return rawConnection.connection;
 }
 
 
-void Transport::setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPointer<qtng::SocketChannel> channel)
+void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<SocketChannel> channel)
 {
     if (rpc.isNull()) {
         return;
@@ -143,18 +143,18 @@ void Transport::setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPo
     channel->setMaxPacketSize(rpc->maxPacketSize());
     channel->setKeepaliveTimeout(rpc->keepaliveTimeout());
 
-    QSharedPointer<qtng::SslSocket> ssl = qtng::convertSocketLikeToSslSocket(request);
-    QSharedPointer<qtng::KcpSocket> kcp;
+    QSharedPointer<SslSocket> ssl = convertSocketLikeToSslSocket(request);
+    QSharedPointer<KcpSocket> kcp;
     if (!ssl.isNull()) {
-        const QByteArray &certPEM = ssl->peerCertificate().save(qtng::Ssl::Pem);
-        const QByteArray &certHash = ssl->peerCertificate().digest(qtng::MessageDigest::Sha256);
+        const QByteArray &certPEM = ssl->peerCertificate().save(Ssl::Pem);
+        const QByteArray &certHash = ssl->peerCertificate().digest(MessageDigest::Sha256);
         if (!certPEM.isEmpty() && !certHash.isEmpty()) {
             channel->setProperty("peer_certificate", certPEM);
             channel->setProperty("peer_certificate_hash", certHash);
         }
-        kcp = qtng::convertSocketLikeToKcpSocket(ssl->backend());
+        kcp = convertSocketLikeToKcpSocket(ssl->backend());
     } else {
-        kcp = qtng::convertSocketLikeToKcpSocket(request);
+        kcp = convertSocketLikeToKcpSocket(request);
     }
 
     if (!kcp.isNull()) {
@@ -164,7 +164,7 @@ void Transport::setupChannel(QSharedPointer<qtng::SocketLike> request, QSharedPo
 }
 
 
-void Transport::handleRequest(QSharedPointer<qtng::SocketLike> request, QByteArray &rpcHeader, bool &done)
+void Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rpcHeader, bool &done)
 {
     if (rpc.isNull()) {
         qCDebug(logger) << "rpc is gone.";
@@ -172,11 +172,11 @@ void Transport::handleRequest(QSharedPointer<qtng::SocketLike> request, QByteArr
         return;
     }
 
-    request->setOption(qtng::Socket::LowDelayOption, true);
+    request->setOption(Socket::LowDelayOption, true);
     rpcHeader = request->recvall(2);
     if (rpcHeader == QByteArray("\x4e\x67")) {
         done = true;
-        QSharedPointer<qtng::SocketChannel> channel(new qtng::SocketChannel(request, qtng::NegativePole));
+        QSharedPointer<SocketChannel> channel(new SocketChannel(request, NegativePole));
         setupChannel(request, channel);
         QString address = getAddressTemplate();
         const HostAddress &peerAddress = request->peerAddress();
@@ -216,20 +216,20 @@ protected:
 };
 
 
-QSharedPointer<qtng::SocketLike> TcpTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> TcpTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
 {
     QSharedPointer<Socket> s(Socket::createConnection(host, port, nullptr, dnsCache));
     if (!s.isNull()) {
         return asSocketLike(s);
     } else {
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
 }
 
 
-QSharedPointer<qtng::BaseStreamServer> TcpTransport::createServer(const QString &, const qtng::HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> TcpTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
-    QSharedPointer<qtng::BaseStreamServer> server(new TcpServer<TcpTransportRequestHandler>(host, port));
+    QSharedPointer<BaseStreamServer> server(new TcpServer<TcpTransportRequestHandler>(host, port));
     server->setUserData(this);
     return server;
 }
@@ -247,20 +247,20 @@ bool TcpTransport::canHandle(const QString &address)
 }
 
 
-QSharedPointer<qtng::SocketLike> SslTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> SslTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
 {
     QSharedPointer<SslSocket> ssl(SslSocket::createConnection(host, port, sslConfig, nullptr, dnsCache));
     if (ssl) {
         return asSocketLike(ssl);
     } else {
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
 }
 
 
-QSharedPointer<qtng::BaseStreamServer> SslTransport::createServer(const QString &, const qtng::HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> SslTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
-    QSharedPointer<qtng::BaseStreamServer> server(new SslServer<TcpTransportRequestHandler>(host, port, sslConfig));
+    QSharedPointer<BaseStreamServer> server(new SslServer<TcpTransportRequestHandler>(host, port, sslConfig));
     server->setUserData(this);
     return server;
 }
@@ -278,17 +278,17 @@ QString SslTransport::getAddressTemplate()
 }
 
 
-class KcpSocketWithFilter: public qtng::KcpSocket
+class KcpSocketWithFilter: public KcpSocket
 {
 public:
-    KcpSocketWithFilter(qtng::HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc);
+    KcpSocketWithFilter(HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc);
     virtual bool filter(char *data, qint32 *len, HostAddress *addr, quint16 *port) override;
     QPointer<Rpc> rpc;
 };
 
 
-KcpSocketWithFilter::KcpSocketWithFilter(qtng::HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc)
-    : qtng::KcpSocket(protocol)
+KcpSocketWithFilter::KcpSocketWithFilter(HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc)
+    : KcpSocket(protocol)
     , rpc(rpc) {}
 
 
@@ -319,21 +319,21 @@ QSharedPointer<SocketLike> KcpServerWithFilter::serverCreate()
 }
 
 
-QSharedPointer<qtng::SocketLike> KcpTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> KcpTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
 {
     QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
                 [this] (HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
     if (kcp) {
         return asSocketLike(kcp);
     } else {
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
 }
 
 
-QSharedPointer<qtng::BaseStreamServer> KcpTransport::createServer(const QString &, const qtng::HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> KcpTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
-    QSharedPointer<qtng::BaseStreamServer> server(new KcpServerWithFilter(host, port));
+    QSharedPointer<BaseStreamServer> server(new KcpServerWithFilter(host, port));
     server->setUserData(this);
     return server;
 }
@@ -354,25 +354,25 @@ QString KcpTransport::getAddressTemplate()
 typedef WithSsl<KcpServerWithFilter> SslKcpServerWithFilter;
 
 
-QSharedPointer<qtng::SocketLike> KcpSslTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> KcpSslTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
 {
     QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
                                                [this] (HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
     if (kcp) {
-        QSharedPointer<SslSocket> ssl(new qtng::SslSocket(asSocketLike(kcp), sslConfig));
+        QSharedPointer<SslSocket> ssl(new SslSocket(asSocketLike(kcp), sslConfig));
         if (!ssl->handshake(false)) {
             return QSharedPointer<SocketLike>();
         }
-        return qtng::asSocketLike(ssl);
+        return asSocketLike(ssl);
     } else {
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
 }
 
 
-QSharedPointer<qtng::BaseStreamServer> KcpSslTransport::createServer(const QString &, const qtng::HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> KcpSslTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
-    QSharedPointer<qtng::BaseStreamServer> server(new SslKcpServerWithFilter(host, port, sslConfig));
+    QSharedPointer<BaseStreamServer> server(new SslKcpServerWithFilter(host, port, sslConfig));
     server->setUserData(this);
     return server;
 }
@@ -390,7 +390,7 @@ QString KcpSslTransport::getAddressTemplate()
 }
 
 
-class LafrpcHttpRequestHandler: public qtng::SimpleHttpRequestHandler
+class LafrpcHttpRequestHandler: public SimpleHttpRequestHandler
 {
 public:
     LafrpcHttpRequestHandler()
@@ -423,25 +423,25 @@ bool LafrpcHttpRequestHandler::setup()
 void LafrpcHttpRequestHandler::doPOST()
 {
     if (path != userData<LafrpcHttpData>()->rpcPath) {
-        return qtng::SimpleHttpRequestHandler::doPOST();
+        return SimpleHttpRequestHandler::doPOST();
     }
     const QByteArray &connectionHeader = header(ConnectionHeader);
     if (connectionHeader.toLower() != "upgrade") {
-        sendError(qtng::NotFound);
+        sendError(NotFound);
         return;
     }
     const QByteArray &upgradeHeader = header(UpgradeHeader);
     if (upgradeHeader.toLower() != "lafrpc") {
-        sendError(qtng::NotFound);
+        sendError(NotFound);
         return;
     }
     QPointer<Rpc> rpc = userData<LafrpcHttpData>()->transport->rpc;
     if (rpc.isNull()) {
-        sendError(qtng::ServiceUnavailable);
+        sendError(ServiceUnavailable);
         return;
     }
     closeConnection = Yes;
-    sendResponse(qtng::SwitchProtocol);
+    sendResponse(SwitchProtocol);
     if (!endHeader()) {
         return;
     }
@@ -486,30 +486,30 @@ QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool &done)
 }
 
 
-QSharedPointer<qtng::SocketLike> HttpTransport::createConnection(const QString &address, const QString &, quint16, QSharedPointer<qtng::SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> HttpTransport::createConnection(const QString &address, const QString &, quint16, QSharedPointer<SocketDnsCache> dnsCache)
 {
-    qtng::HttpRequest request("POST", address);
+    HttpRequest request("POST", address);
     request.setStreamResponse(true);
     request.addHeader("Connection", "Upgrade");
     request.addHeader("Upgrade", "lafrpc");
     session->setDnsCache(dnsCache);
-    qtng::HttpResponse response = session->send(request);
+    HttpResponse response = session->send(request);
     if (!response.isOk()) {
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
-    if (response.statusCode() != qtng::SwitchProtocol) {
+    if (response.statusCode() != SwitchProtocol) {
         qCDebug(logger) << "server is a plain http server, while does not support lafrpc.";
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
     QByteArray leftBytes;
-    QSharedPointer<qtng::SocketLike> stream = response.takeStream(&leftBytes);
+    QSharedPointer<SocketLike> stream = response.takeStream(&leftBytes);
     if (Q_UNLIKELY(stream.isNull())) {
         qCWarning(logger) << "got invalid stream";
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
     if (Q_UNLIKELY(!leftBytes.isEmpty())) {
         qCWarning(logger) << "the server should not send body.";
-        return QSharedPointer<qtng::SocketLike>();
+        return QSharedPointer<SocketLike>();
     }
     return stream;
 }
@@ -528,7 +528,7 @@ public:
 };
 
 
-QSharedPointer<qtng::BaseStreamServer> HttpTransport::createServer(const QString &address, const qtng::HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> HttpTransport::createServer(const QString &address, const HostAddress &host, quint16 port)
 {
     QUrl u(address);
     QString rpcPath = u.path();
@@ -586,7 +586,7 @@ public:
 };
 
 
-QSharedPointer<qtng::BaseStreamServer> HttpsTransport::createServer(const QString &address, const qtng::HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> HttpsTransport::createServer(const QString &address, const HostAddress &host, quint16 port)
 {
     QUrl u(address);
     QString rpcPath = u.path();
@@ -631,7 +631,7 @@ bool HttpsTransport::canHandle(const QString &address)
 }
 
 
-QSharedPointer<SocketLike> HttpSslTransport::createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> HttpSslTransport::createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
 {
     QString tmpAddress = address;
     tmpAddress.replace(QString::fromUtf8("http+ssl://"), QString::fromUtf8("http://"));
@@ -647,7 +647,7 @@ QSharedPointer<SocketLike> HttpSslTransport::createConnection(const QString &add
 }
 
 
-QSharedPointer<qtng::BaseStreamServer> HttpSslTransport::createServer(const QString &address, const qtng::HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> HttpSslTransport::createServer(const QString &address, const HostAddress &host, quint16 port)
 {
     QUrl u(address);
     QString rpcPath = u.path();

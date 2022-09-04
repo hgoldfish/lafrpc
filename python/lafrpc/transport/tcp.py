@@ -100,7 +100,7 @@ class TcpTransport(BaseTransport):
             except socket.error:
                 logger.exception("request is disconnected while prepare peer.")
                 return
-            except Exception:
+            except:
                 logger.exception("prepare_peer is failed.")
                 return
         elif header == b"\x33\x74":

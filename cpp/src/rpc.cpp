@@ -20,7 +20,7 @@ KcpFilter::~KcpFilter() {}
 
 
 RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *parent)
-    : maxPacketSize(1024 * 1024 * 64)
+    : maxPacketSize(0)
     , keepaliveTimeout(1000 * 20)
     , kcpMode(qtng::KcpSocket::Internet)
     , serialization(serialization)

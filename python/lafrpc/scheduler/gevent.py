@@ -1,3 +1,5 @@
+import logging
+
 from gevent.exceptions import InvalidSwitchError
 from greenlet import GreenletExit
 from gevent import spawn as gevent_spawn, Timeout, getcurrent, sleep as gevent_sleep
@@ -10,6 +12,9 @@ from .base import BaseScheduler
 from gevent.socket import socket as GeventSocket
 # noinspection PyUnresolvedReferences
 from gevent.ssl import SSLContext as GeventSSLContext
+
+
+logger = logging.getLogger(__name__)
 
 
 class GeventQueueWithGetting(GeventQueue):

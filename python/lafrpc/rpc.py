@@ -1,7 +1,9 @@
+import socket
 import uuid
 import logging
 import ssl
-from typing import Optional
+from typing import Optional, Tuple
+
 from .deferred import Signal
 from .network import DataChannel
 from .utils import RegisterServicesMixin
@@ -98,7 +100,7 @@ class Rpc(RegisterServicesMixin):
     timeout = 10.0
     peer_version = 1
     max_packet_size = 1024 * 64
-    keepalive_timeout = 10.0
+    keepalive_timeout = 30.0
 
     new_peer: Signal
 
@@ -144,14 +146,13 @@ class Rpc(RegisterServicesMixin):
             self.my_peer_name = my_peer_name
 
     def load_key(self, certfile, keyfile, password = None):
-        ssl_context = self.io_scheduler.SSLContext()
+        # noinspection PyUnresolvedReferences
+        ssl_context = self.io_scheduler.SSLContext(ssl.PROTOCOL_TLSv1_1)
         ssl_context.load_default_certs()
         ssl_context.load_cert_chain(certfile, keyfile, password)
         ssl_context.check_hostname = False
         # noinspection PyUnresolvedReferences
         ssl_context.verify_mode = ssl.CERT_NONE
-        # noinspection PyUnresolvedReferences
-        ssl_context.protocol = ssl.PROTOCOL_TLS
         for transport in self.transports:
             if transport.is_secure:
                 transport.ssl_context = ssl_context
@@ -212,6 +213,13 @@ class Rpc(RegisterServicesMixin):
 
     def stop_server(self, server_address):
         return self.stop_servers(server_address)[0]
+
+    def handle_request(self, request: socket.socket, remote_address: str):
+        tcp_transport = self._find_transport("tcp://127.0.0.1:7982/")
+        if tcp_transport is None:
+            raise RpcInternalException()
+        # noinspection PyUnresolvedReferences
+        tcp_transport.handle_request(request, remote_address)
 
     def shutdown(self):
         self.stop_servers()
@@ -306,10 +314,12 @@ class Rpc(RegisterServicesMixin):
             channel = transport.connect(peer_address)
             if channel is None:
                 return None
-            peer = self.prepare_peer(channel, peer_name, peer_address)
-            event.set()
-            with self.lock:
-                del self.connecting_events[peer_address]
+            try:
+                peer = self.prepare_peer(channel, peer_name, peer_address)
+            finally:
+                event.set()
+                with self.lock:
+                    del self.connecting_events[peer_address]
             return peer
 
     def is_connected(self, peer_name):

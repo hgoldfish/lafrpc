@@ -145,6 +145,12 @@ class RpcFile(UseStream):
         if count != self.size:
             raise RpcFile.Failed("can not read file.")
 
+        # ensure all data sent.
+        try:
+            self.channel.recv_packet()
+        except IOError:
+            pass
+
     def _sendfile(self, source, target, total_bytes_to_send):
         if self.size == 0:
             return
@@ -160,6 +166,10 @@ class RpcFile(UseStream):
             write_target = target.write
             if self.hash:
                 hasher = hashlib.sha256()
+        if hasattr(target, "recv"):
+            read_target = target.recv
+        else:
+            read_target = target.read
 
         count = 0
         while True:
@@ -185,6 +195,12 @@ class RpcFile(UseStream):
             my_hash = hasher.digest()
             if my_hash != self.hash:
                 raise RpcFile.Failed("file is corrupted")
+
+        # ensure all data sent.
+        try:
+            read_target(1)
+        except IOError:
+            pass
 
     def __getstate__(self):
         return {

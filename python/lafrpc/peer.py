@@ -223,7 +223,12 @@ class Peer(RegisterServicesMixin):
         except SerializationException:
             raise RpcSerializationException(
                 "can not serialize request while calling remote method: {0}".format(method_name))
-        self.channel.send_packet(request_bytes)
+        try:
+            self.channel.send_packet(request_bytes)
+        except IOError:
+            if debug_protocol:
+                logger.debug("can not send request to the other peer: %s", self.channel.error.description)
+            raise
 
         if not self.is_ok():
             raise RpcDisconnectedException("rpc is gone.")
@@ -252,8 +257,11 @@ class Peer(RegisterServicesMixin):
             except KeyError:
                 pass
 
-        if not response or not response.is_ok() or not self.is_ok():
+        if not response or not self.is_ok():
             raise RpcDisconnectedException("rpc is gone.")
+
+        if isinstance(response, RpcException):
+            raise response
 
         if response.exception is not None:
             raise response.exception
@@ -290,7 +298,10 @@ class Peer(RegisterServicesMixin):
                 for waiter_id, _waiter in self.waiters.items():
                     _waiter.send(RpcDisconnectedException("channel is shutdown."))
                 self.waiters = {}
-            self.channel.close()
+            if self.channel.is_ok:
+                self.channel.close()
+            if debug_protocol:
+                logger.debug("shutting down channel: %s", self.channel.error.description)
             if isinstance(self, weakref.ProxyType):
                 # noinspection PyUnresolvedReferences
                 self.disconnected.emit(self.handle_packet.__self__)
@@ -306,11 +317,15 @@ class Peer(RegisterServicesMixin):
                 packet = self.channel.recv_packet()
             except IOError:
                 if debug_protocol:
-                    logger.debug("channel is shutdown while receiving packet.")
+                    logger.exception("channel is shutdown while receiving packet: %s", self.channel.error.description)
                 return clean()
             except Exit:
                 if debug_protocol:
-                    logger.debug("channel is requested to shutdown while receiving packet.")
+                    logger.exception("channel is requested to shutdown while receiving packet.")
+                return clean()
+            except Exception:
+                if debug_protocol:
+                    logger.exception("caught unknown error.")
                 return clean()
             if not self.rpc_ref():
                 if debug_protocol:
@@ -406,10 +421,15 @@ class Peer(RegisterServicesMixin):
             except self.rpc_ref().io_scheduler.Exit:
                 return
             except RpcRemoteException as e:
+                if debug_protocol:
+                    logger.exception("the method throw a remote exception.")
                 response.exception = e
             except RpcDisconnectedException:
+                if debug_protocol:
+                    logger.debug("the method throw a disconnected exception.")
                 return
             except RpcInternalException:
+                logger.warning("the method throw an internal exception.")
                 response.exception = RpcRemoteException("internal error.")
             except Exception:
                 logger.exception("error occurs while processing rpc call: {0}".format(request.method_name))
@@ -439,7 +459,13 @@ class Peer(RegisterServicesMixin):
                                      sub_channel2, raw_socket)
 
         response_bytes = pack_response(self.rpc_ref().serialization, response)
-        self.channel.send_packet(response_bytes)
+        try:
+            self.channel.send_packet(response_bytes)
+        except IOError:
+            if debug_protocol:
+                logger.debug("can not send response packet to the peer: %s", self.channel.error.description)
+            raise
+
 
         if response.exception is None and stream_from_server:
             # noinspection PyProtectedMember

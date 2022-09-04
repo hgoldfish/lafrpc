@@ -7,11 +7,12 @@ class SslTransport(TcpTransport):
 
     def __init__(self, rpc):
         TcpTransport.__init__(self, rpc)
-        self.ssl_context = rpc.io_scheduler.SSLContext()
+        # noinspection PyUnresolvedReferences
+        self.ssl_context = rpc.io_scheduler.SSLContext(ssl.PROTOCOL_TLSv1_1)
         self.ssl_context.load_default_certs()
         self.ssl_context.check_hostname = False
+        # noinspection PyUnresolvedReferences
         self.ssl_context.verify_mode = ssl.CERT_NONE
-        self.ssl_context.protocol = ssl.PROTOCOL_TLS
 
     def can_handle(self, address):
         return address.startswith("ssl://")

@@ -396,7 +396,7 @@ void PeerPrivate::handlePacket()
         }
 
         if (packet.isEmpty()) {
-            qCDebug(logger) << "channel disconnected while receiving packet.";
+            qCDebug(logger) << "channel disconnected while receiving packet:" << channel->errorString();
             return shutdown();
         }
 

@@ -115,7 +115,7 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
         while (count < size) {
             const QByteArray &buf = q->channel->recvPacket();
             if (buf.isEmpty()) {
-                qCWarning(logger) << "rpc file receiving error.";
+                qCWarning(logger) << "rpc file receiving error." << q->channel->errorString();
                 progressCallback(-1, count, size);
                 return false;
             }
@@ -143,7 +143,7 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
         while (count < size) {
             const QByteArray &buf = q->channel->recvPacket();
             if (buf.isEmpty()) {
-                qCWarning(logger) << "rpc file receiving error.";
+                qCWarning(logger) << "rpc file receiving error." << q->channel->errorString();;
                 return false;
             }
             qint64 writtenBytes = f->write(buf);

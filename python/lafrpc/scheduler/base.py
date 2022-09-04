@@ -138,31 +138,33 @@ class BaseScheduler:
         self.tasks[name] = task
         return task
 
-    def kill(self, task_name: str, remove=True):
-        if task_name not in self.tasks:
+    def kill(self, task_name: str, join=True):
+        try:
+            if join:
+                task = self.tasks.pop(task_name)
+            else:
+                task = self.tasks[task_name]
+        except KeyError:
             return False
-        task = self.tasks.get(task_name)
-        if remove:
-            try:
-                del self.tasks[task_name]
-            except KeyError:
-                pass
-
-        if task:  # task is not exists or task is not running
-            task.kill()
+        task.kill()
+        if join:
+            task.join()
         return True
 
-    def kill_all(self, remove=True):
-        for task_id, task in self.tasks.items():
-            if task:
+    def kill_all(self, join=True):
+        if join:
+            while self.tasks:
+                name, task = self.tasks.popitem()
                 task.kill()
-        if remove:
-            self.tasks = {}
+                task.join()
+        else:
+            for name, task in self.tasks.items():
+                task.kill()
         return True
 
-    def kill_many(self, pattern: str, remove=True):
+    def kill_many(self, pattern: str, join=True):
         to_kills = []
-        if remove:
+        if join:
             left_tasks = {}
             for task_name, task in self.tasks.items():
                 if fnmatch.fnmatch(task_name, pattern):
@@ -176,6 +178,8 @@ class BaseScheduler:
                     to_kills.append(task)
         for task in to_kills:
             task.kill()
+            if join:
+                task.join()
         return len(to_kills) > 0
 
     def join(self, task_name: str) -> bool:
@@ -183,6 +187,12 @@ class BaseScheduler:
             return False
         task = self.tasks[task_name]
         task.join()
+        return True
+
+    def join_all(self):
+        while self.tasks:
+            name, task = self.tasks.popitem()
+            task.join()
         return True
 
     def get_current(self):
