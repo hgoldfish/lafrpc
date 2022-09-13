@@ -31,7 +31,7 @@ public:
     virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray &connectionId);
     virtual QSharedPointer<qtng::SocketLike> takeRawSocket(const QByteArray &connectionId);
     virtual bool canHandle(const QString &address) = 0;
-    void handleRequest(QSharedPointer<qtng::SocketLike> request, QByteArray &rpcHeader, bool &done);
+    bool handleRequest(QSharedPointer<qtng::SocketLike> request, QByteArray &rpcHeader);
 protected:
     virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
                                                               QSharedPointer<qtng::SocketDnsCache> dnsCache) = 0;

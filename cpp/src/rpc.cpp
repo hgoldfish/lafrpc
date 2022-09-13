@@ -693,16 +693,18 @@ QVariantMap Rpc::getRpcHeader()
 }
 
 
-void Rpc::handleRequest(QSharedPointer<qtng::SocketLike> connection, const QString &address)
+bool Rpc::handleRequest(QSharedPointer<qtng::SocketLike> connection, const QString &address)
 {
     Q_D(Rpc);
     for (QSharedPointer<Transport> transport: d->transports) {
         if (transport->canHandle(address)) {
             QByteArray rpcHeader;
-            bool done;
-            transport->handleRequest(connection, rpcHeader, done);
+            if (transport->handleRequest(connection, rpcHeader)) {
+                return true;
+            }
         }
     }
+    return false;
 }
 
 

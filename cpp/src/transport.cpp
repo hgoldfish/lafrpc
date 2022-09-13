@@ -164,18 +164,16 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
 }
 
 
-void Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rpcHeader, bool &done)
+bool Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rpcHeader)
 {
     if (rpc.isNull()) {
         qCDebug(logger) << "rpc is gone.";
-        done = false;
-        return;
+        return false;
     }
 
     request->setOption(Socket::LowDelayOption, true);
     rpcHeader = request->recvall(2);
     if (rpcHeader == QByteArray("\x4e\x67")) {
-        done = true;
         QSharedPointer<SocketChannel> channel(new SocketChannel(request, NegativePole));
         setupChannel(request, channel);
         QString address = getAddressTemplate();
@@ -189,17 +187,17 @@ void Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rp
         qCDebug(logger) << "got request from:" << address;
         rpc->preparePeer(channel, QString(), address);
     } else if (rpcHeader == QByteArray("\x33\x74")) {
-        done = true;
         const QByteArray &connectionId = request->recvall(16);
         if (request->sendall("\xf3\x97") != 2) {
             qCDebug(logger) << "handshaking is failed in server side.";
-            return;
+            return false;
         }
         qCDebug(logger) << "got raw socket:" << connectionId;
         rawConnections.insert(connectionId, RawSocket(request, QDateTime::currentDateTime()));
     } else {
-        done = false;
+        return false;
     }
+    return true;
 }
 
 
@@ -208,9 +206,8 @@ class TcpTransportRequestHandler: public BaseRequestHandler
 protected:
     virtual void handle() override
     {
-        bool done;
         QByteArray rpcHeader;
-        userData<TcpTransport>()->handleRequest(request, rpcHeader, done);
+        userData<TcpTransport>()->handleRequest(request, rpcHeader);
     }
     virtual void finish() override {}
 };
@@ -459,8 +456,7 @@ void LafrpcHttpRequestHandler::doPOST()
     }
 
     QByteArray rpcHeader;
-    bool done;
-    userData<LafrpcHttpData>()->transport->handleRequest(stream, rpcHeader, done);
+    bool done = userData<LafrpcHttpData>()->transport->handleRequest(stream, rpcHeader);
     if (done) {
         closeRequest = false;
     }
@@ -478,7 +474,7 @@ void LafrpcHttpRequestHandler::finish()
 QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool &done)
 {
     QByteArray rpcHeader;
-    userData<LafrpcHttpData>()->transport->handleRequest(request, rpcHeader, done);
+    done = userData<LafrpcHttpData>()->transport->handleRequest(request, rpcHeader);
     if (done) {
         closeRequest = false;
     }
