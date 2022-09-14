@@ -9,6 +9,7 @@ from .sendfile import RpcFile
 
 __all__ = ["Rpc", "UseStream", "exported", "is_exported", "TransferTimeout", "ConnectTimeOut",
            "RpcException", "RpcDisconnectedException", "RpcRemoteException", "RpcFile",
-           "RpcSerializationException", "RpcInternalException", "Request", "Response", "register_class"]
+           "RpcSerializationException", "RpcInternalException", "Request", "Response", "register_class",
+           "Peer"]
 
 

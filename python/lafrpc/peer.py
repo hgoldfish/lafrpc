@@ -12,7 +12,7 @@ from .utils import RegisterServicesMixin, RpcProxy, DeferredRpcProxy, create_uui
 
 logger = logging.getLogger(__name__)
 
-debug_protocol = True
+debug_protocol = False
 
 
 def recv(connection, size):

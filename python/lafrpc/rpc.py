@@ -215,11 +215,11 @@ class Rpc(RegisterServicesMixin):
         return self.stop_servers(server_address)[0]
 
     def handle_request(self, request: socket.socket, remote_address: str):
-        tcp_transport = self._find_transport("tcp://127.0.0.1:7982/")
-        if tcp_transport is None:
+        transport = self._find_transport(remote_address)
+        if transport is None:
             raise RpcInternalException()
         # noinspection PyUnresolvedReferences
-        tcp_transport.handle_request(request, remote_address)
+        transport.handle_request(request, remote_address)
 
     def shutdown(self):
         self.stop_servers()
