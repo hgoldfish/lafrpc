@@ -193,11 +193,14 @@ class DataChannel:
         self.pending_channels.return_many_forcely(tmp)
         return found
 
-    def recv_packet(self) -> bytes:
+    def recv_packet(self, no_wait=False) -> bytes:
         with self.lock:
             if self.receiving_queue.empty() and self.error != ChannelError.NoError:
                 raise IOError()
-        packet = self.receiving_queue.get()
+        if no_wait:
+            packet = self.receiving_queue.get_nowait()
+        else:
+            packet = self.receiving_queue.get()
         if isinstance(packet, IOError):
             # self.close() #为了处理对端主动close()，doReceive()不会销毁整个Channel.
             raise packet

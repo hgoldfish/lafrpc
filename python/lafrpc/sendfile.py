@@ -2,6 +2,7 @@ import os
 import io
 import logging
 import hashlib
+from queue import Empty
 from .base import UseStream, RpcException
 from .serialization import register_class
 
@@ -118,7 +119,7 @@ class RpcFile(UseStream):
         except Exception:
             logger.exception("can not set file's mtime & atime.")
 
-    def read_from(self, fin):
+    def read_from(self, fin, no_wait:bool=False):
         if self.size == 0:
             return
         self.wait_for_ready()
@@ -147,7 +148,9 @@ class RpcFile(UseStream):
 
         # ensure all data sent.
         try:
-            self.channel.recv_packet()
+            self.channel.recv_packet(no_wait=no_wait)
+        except Empty:
+            pass
         except IOError:
             pass
 
