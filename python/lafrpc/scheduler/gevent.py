@@ -4,7 +4,7 @@ from gevent.exceptions import InvalidSwitchError
 from greenlet import GreenletExit
 from gevent import spawn as gevent_spawn, Timeout, getcurrent, sleep as gevent_sleep
 from gevent.event import Event
-from gevent.queue import Queue as GeventQueue, Full, ItemWaiter
+from .queue import Queue as GeventQueue, Full, ItemWaiter
 from gevent.lock import RLock as GeventLock
 from .base import BaseScheduler
 
