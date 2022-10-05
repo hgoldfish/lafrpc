@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 debug_protocol = False
 
-DefaultPacketSize = 1024 * 4
+DefaultPacketSize = 1024 * 64 - 8
+DefaultPayloadSizeHint = 1400
 
 
 def recvall(connection, size):
@@ -375,10 +376,10 @@ class SocketDataChannel(DataChannel):
             pass
         self.sending_queue = io_scheduler.Queue()
         self.name = str(uuid.uuid4())
-        self._max_payload_size = 1024 * 64 - 8
-        self._payload_size_hint = 1400
+        self._max_payload_size = DefaultPacketSize
+        self._payload_size_hint = DefaultPayloadSizeHint
         self._keepalive_timeout = 10 * 1000
-        self._keepalive_interval = 2 * 1000
+        self._keepalive_interval = 1 * 1000
         io_scheduler.spawn_with_name("sending-{0}".format(self.name), self._do_send)
         io_scheduler.spawn_with_name("receiving-{0}".format(self.name), self._do_receive)
         io_scheduler.spawn_with_name("keepalive-{0}".format(self.name), self._do_keepalive)
@@ -414,6 +415,11 @@ class SocketDataChannel(DataChannel):
 
     @payload_size_hint.setter
     def payload_size_hint(self, payload_size_hint: int):
+        if payload_size_hint <= 0:
+            payload_size_hint = DefaultPayloadSizeHint
+        elif payload_size_hint < 64:
+            logger.warning("the payload size hint of DataChannel should not lesser than 64.")
+            return
         with self.lock:
             self._payload_size_hint = min(payload_size_hint, self._max_payload_size)
 
@@ -444,6 +450,8 @@ class SocketDataChannel(DataChannel):
             if self.error != ChannelError.NoError:
                 return
             self.error = reason
+            if debug_protocol:
+                logger.debug("正在关闭连接: %s", reason.description)
         try:
             self.connection.close()
         except socket.error:
@@ -482,7 +490,7 @@ class SocketDataChannel(DataChannel):
     def _do_send(self):
         while True:
             try:
-                channel_number, packet, done = self.sending_queue.get()
+                channel_number, payload, done = self.sending_queue.get()
             except self.io_scheduler.Exit:
                 if debug_protocol:
                     logger.debug("等待发送队列数据到达前线程退出。")
@@ -496,8 +504,8 @@ class SocketDataChannel(DataChannel):
                 return
             # noinspection PyBroadException
             try:
-                header = struct.pack(b"!II", len(packet), channel_number)
-                buf = header + packet
+                header = struct.pack(b"!II", len(payload), channel_number)
+                buf = header + payload
                 self.connection.sendall(buf)
             except socket.error as e:
                 if debug_protocol:
@@ -637,6 +645,8 @@ class VirtualDataChannel(DataChannel):
             if self.error != ChannelError.NoError:
                 return
             self.error = reason
+            if debug_protocol:
+                logger.debug("正在关闭子通道: %s", reason.description)
 
         for i in range(self.receiving_queue.getting()):
             self.receiving_queue.put(IOError())

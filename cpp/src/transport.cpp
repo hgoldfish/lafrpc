@@ -141,6 +141,7 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
         return;
     }
     channel->setMaxPacketSize(rpc->maxPacketSize());
+    channel->setPayloadSizeHint(rpc->payloadSizeHint());
     channel->setKeepaliveTimeout(rpc->keepaliveTimeout());
 
     QSharedPointer<SslSocket> ssl = convertSocketLikeToSslSocket(request);

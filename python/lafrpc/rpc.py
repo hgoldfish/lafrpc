@@ -99,7 +99,9 @@ class Rpc(RegisterServicesMixin):
 
     timeout = 10.0
     peer_version = 1
-    max_packet_size = 1024 * 64
+    # 根据 data channel 的设定，<= 0 时表示不修改。
+    max_packet_size = 0
+    payload_size_hint = 0
     keepalive_timeout = 30.0
 
     new_peer: Signal

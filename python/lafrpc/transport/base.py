@@ -124,6 +124,7 @@ class BaseTransport:
             return
         channel.keepalive_timeout = rpc.keepalive_timeout
         channel.max_packet_size = rpc.max_packet_size
+        channel.payload_size_hint = rpc.payload_size_hint
 
     def create_connection(self, remote_address: str, timeout: float) -> Optional[socket.socket]:
         raise NotImplementedError()

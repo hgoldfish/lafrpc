@@ -21,6 +21,7 @@ KcpFilter::~KcpFilter() {}
 
 RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *parent)
     : maxPacketSize(0)
+    , payloadSizeHint(0)
     , keepaliveTimeout(1000 * 20)
     , kcpMode(qtng::KcpSocket::Internet)
     , serialization(serialization)
@@ -493,6 +494,20 @@ void Rpc::setMaxPacketSize(quint32 maxPacketSize)
 }
 
 
+void Rpc::setPayloadSizeHint(quint32 payloadSizeHint)
+{
+    Q_D(Rpc);
+    d->payloadSizeHint = payloadSizeHint;
+}
+
+
+quint32 Rpc::payloadSizeHint() const
+{
+    Q_D(const Rpc);
+    return d->payloadSizeHint;
+}
+
+
 float Rpc::keepaliveTimeout() const
 {
     Q_D(const Rpc);
@@ -791,6 +806,15 @@ RpcBuilder &RpcBuilder::maxPacketSize(quint32 maxPacketSize)
 {
     if (!rpc.isNull()) {
         rpc->d_func()->maxPacketSize = maxPacketSize;
+    }
+    return *this;
+}
+
+
+RpcBuilder &RpcBuilder::payloadSizeHint(quint32 payloadSizeHint)
+{
+    if (!rpc.isNull()) {
+        rpc->d_func()->payloadSizeHint = payloadSizeHint;
     }
     return *this;
 }

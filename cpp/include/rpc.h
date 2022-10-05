@@ -53,6 +53,8 @@ signals:
 public:
     quint32 maxPacketSize() const;
     void setMaxPacketSize(quint32 maxPacketSize);
+    quint32 payloadSizeHint() const;
+    void setPayloadSizeHint(quint32 payloadSizeHint);
     float keepaliveTimeout() const;
     void setKeepaliveTimeout(float keepaliveTimeout);
     qtng::KcpSocket::Mode kcpMode() const;
@@ -109,6 +111,7 @@ public:
     RpcBuilder &kcpFilter(QSharedPointer<KcpFilter> kcpFilter);
     RpcBuilder &kcpMode(qtng::KcpSocket::Mode kcpMode);
     RpcBuilder &maxPacketSize(quint32 maxPacketSize);
+    RpcBuilder &payloadSizeHint(quint32 payloadSizeHint);
     RpcBuilder &keepaliveTimeout(float keepaliveTimeout);
     RpcBuilder &myPeerName(const QString &myPeerName);
     RpcBuilder &httpRootDir(const QDir &rootDir);
