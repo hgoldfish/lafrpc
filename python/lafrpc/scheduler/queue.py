@@ -312,8 +312,8 @@ class Queue(object):
             repeat = False
             if self.putters and (self._maxsize == -1 or self.qsize() < self._maxsize):
                 repeat = True
+                putter = self.putters.popleft()
                 try:
-                    putter = self.putters.popleft()
                     self._put(putter.item)
                 except: # pylint:disable=bare-except
                     putter.throw(*sys.exc_info())
