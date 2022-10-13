@@ -183,12 +183,11 @@ class Peer(RegisterServicesMixin):
             raise RpcInternalException("error occurs while calling RPC remote method.")
 
     def _call(self, method_name, args, kwargs):
+        stream_from_client: UseStream = None
         for param in itertools.chain(args, kwargs.values()):
             if isinstance(param, UseStream):
                 stream_from_client = param
                 break
-        else:
-            stream_from_client = None
         request = Request()
         request.method_name, request.args, request.kwargs = method_name, args, kwargs
         request.id = create_uuid().encode("utf-8")
@@ -267,7 +266,7 @@ class Peer(RegisterServicesMixin):
             raise response.exception
 
         if isinstance(response.result, UseStream):
-            stream_from_server = response.result
+            stream_from_server: UseStream = response.result
             sub_channel2 = self.channel.get_channel(response.channel)
             if sub_channel2 is None:
                 message = ("remote method `{0}` returns an UseStream object, " +

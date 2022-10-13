@@ -4,14 +4,13 @@ from gevent.exceptions import InvalidSwitchError
 from greenlet import GreenletExit
 from gevent import spawn as gevent_spawn, Timeout, getcurrent, sleep as gevent_sleep
 from gevent.event import Event
-from .queue import Queue as GeventQueue, Full, ItemWaiter
 from gevent.lock import RLock as GeventLock
-from .base import BaseScheduler
-
 # noinspection PyUnresolvedReferences,PyProtectedMember,PyPep8Naming
 from gevent.socket import socket as GeventSocket
 # noinspection PyUnresolvedReferences
 from gevent.ssl import SSLContext as GeventSSLContext
+from .base import BaseScheduler
+from .queue import Queue as GeventQueue, Full, ItemWaiter
 
 
 logger = logging.getLogger(__name__)

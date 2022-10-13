@@ -324,6 +324,7 @@ class Queue(object):
                 getter = self.getters.popleft()
                 getter.switch(getter)
             if not repeat:
+                self._event_unlock = None
                 return
 
     def _schedule_unlock(self):
