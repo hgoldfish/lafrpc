@@ -2,7 +2,7 @@ import socket
 import uuid
 import logging
 import ssl
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, List
 
 from .deferred import Signal
 from .network import DataChannel
@@ -114,18 +114,17 @@ class Rpc(RegisterServicesMixin):
         else:
             self.my_peer_name = my_peer_name
 
-        self.peers = {}
-        self.server_address_list = []
-        self.known_addresses = {}
-        self.local_store = {}
-        self.waiters = {}
+        self.peers: Dict[str, Peer] = {}
+        self.server_address_list: List[str] = []
+        self.known_addresses: Dict[str, str] = {}
+        self.local_store: Dict[str, object] = {}
         self.lock = io_scheduler.Lock()
-        self.transports = []
+        self.transports: List[BaseTransport] = []
         self.io_scheduler = io_scheduler
         assert isinstance(serialization, BaseSerialization)
         self.serialization = serialization
         self.new_peer = Signal(Peer)
-        self.connecting_events = {}
+        self.connecting_events: Dict[str, io_scheduler.Event] = {}
         self.make_header_callback = None
         self.auth_header_callback = None
         for name, clazz in avaliable_transports.items():
@@ -133,7 +132,7 @@ class Rpc(RegisterServicesMixin):
         serialization.register_class(RpcRemoteException)
 
     @classmethod
-    def use(cls, *profile_names, my_peer_name = None):
+    def use(cls, *profile_names, my_peer_name: str = None):
         if RpcProfileManager.check_conflict(profile_names):
             raise RpcProfileException("conflict profiles: {0}".format(",".join(profile_names)))
         io_scheduler = RpcProfileManager.create_io_scheduler(*profile_names)
@@ -143,11 +142,11 @@ class Rpc(RegisterServicesMixin):
         rpc = cls(serialization, io_scheduler, my_peer_name)
         return rpc
 
-    def set_my_peer_name(self, my_peer_name):
+    def set_my_peer_name(self, my_peer_name: str):
         with self.lock:
             self.my_peer_name = my_peer_name
 
-    def load_key(self, certfile, keyfile, password = None):
+    def load_key(self, certfile: str, keyfile: str, password: str = None):
         # noinspection PyUnresolvedReferences
         ssl_context = self.io_scheduler.SSLContext(ssl.PROTOCOL_TLSv1_1)
         ssl_context.load_default_certs()
@@ -159,14 +158,14 @@ class Rpc(RegisterServicesMixin):
             if transport.is_secure:
                 transport.ssl_context = ssl_context
 
-    def _find_transport(self, address) -> Optional[BaseTransport]:
+    def _find_transport(self, address: str) -> Optional[BaseTransport]:
         for transport in self.transports:
             if transport.can_handle(address):
                 return transport
         return None
 
     @staticmethod
-    def _make_worker_name(server_address):
+    def _make_worker_name(server_address: str):
         worker_name = "server-" + str(hash(server_address))
         return worker_name
 
@@ -446,9 +445,6 @@ class Rpc(RegisterServicesMixin):
         peer.disconnected.connect(self._remove_peer)
         with self.lock:
             self.peers[its_peer_name] = peer
-            waiter = self.waiters.get(its_peer_name, None)
-        if waiter is not None:
-            waiter.set()
         # TODO emit new_peer event
         self.new_peer.emit(peer)
         return peer

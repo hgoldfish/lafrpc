@@ -534,6 +534,9 @@ class Peer(RegisterServicesMixin):
         with self.lock:
             self.properties[name] = value
 
-    def get_property(self, name):
+    def get_property(self, name, default_value = None):
         with self.lock:
-            return self.properties[name]
+            if default_value is None:
+                return self.properties[name]
+            else:
+                return self.properties.get(name, default_value)
