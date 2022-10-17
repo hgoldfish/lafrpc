@@ -71,22 +71,49 @@ public:
     bool stopServer(const QString &address);
     void shutdown();
 
+    // connect to the peer, got raw socket.
     QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray &connectionId);
+
+    // the other peer was connected to me, so take the raw socket with the connection id.
     QSharedPointer<qtng::SocketLike> takeRawSocket(const QString &peerName, const QByteArray &connectionId);
+
+    // connect to peer name or address, if disconnected, do reconnect.
     QSharedPointer<Peer> connect(const QString &peerNameOrAddress);
+
+    // get peer for name, if disconnected, return nullptr.
     QSharedPointer<Peer> get(const QString &peerName) const;
+
+    // get all peers with the peer name. some one may disconnected.
     QList<QSharedPointer<Peer>> getAll(const QString &peerName) const;
+
+    // get all peer names, some one may disconnected.
     QStringList getAllPeerNames() const;
+
+    // get all peers, some one may disconnected.
     QList<QSharedPointer<Peer>> getAllPeers() const;
 
+    // is the peer connected?
     bool isConnected(const QString &peerName) const;
+
+    // am I connecting to the peer with peer address?
     bool isConnecting(const QString &peerAddress) const;
+
+    // get the address of peer
     QString address(const QString &peerName) const;
+
+    // set the address of peer.
     void setAddress(const QString &peerName, const QString &peerAddress);
+
+    // get the current peer, always using this in the service method. or return nullptr.
     QPointer<Peer> getCurrentPeer();
+
+    // get the current rpc header. like getCurrentPeer().
     QVariantMap getRpcHeader();
 
+    // turn a socket connection into rpc peer or raw socket.
     bool handleRequest(QSharedPointer<qtng::SocketLike> connection, const QString &address);
+
+    // turn a data channel into rpc peer.
     QSharedPointer<Peer> preparePeer(QSharedPointer<qtng::DataChannel> channel, const QString &name, const QString &address);
 public:
     static RpcBuilder builder(SerializationType serialization);

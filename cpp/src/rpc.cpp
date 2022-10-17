@@ -217,19 +217,19 @@ void RpcPrivate::shutdown()
 }
 
 
-QSharedPointer<Peer> RpcPrivate::connect(const QString &peerName)
+QSharedPointer<Peer> RpcPrivate::connect(const QString &peerNameOrAddress)
 {
-    if (peers.contains(peerName)) {
-        QSharedPointer<Peer> peer = peers.value(peerName);
+    if (peers.contains(peerNameOrAddress)) {
+        QSharedPointer<Peer> peer = peers.value(peerNameOrAddress);
         if (!peer.isNull()) {
             return peer;
         }
     }
     QString peerAddress;
-    if (knownAddresses.contains(peerName)) {
-        peerAddress = knownAddresses.value(peerName);
-    } else if (peerName.contains(QString::fromLatin1("//"))){
-        peerAddress = peerName;
+    if (knownAddresses.contains(peerNameOrAddress)) {
+        peerAddress = knownAddresses.value(peerNameOrAddress);
+    } else if (peerNameOrAddress.contains(QString::fromLatin1("//"))){
+        peerAddress = peerNameOrAddress;
         for (QSharedPointer<Peer> peer: peers.values()) {
             if (peer->address() == peerAddress) {
                 return peer;
@@ -274,7 +274,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerName)
             qCDebug(logger) << "Rpc::connect() -> can not connect to" << peerAddress;
 #endif
         } else {
-            peer = preparePeer(channel, knownAddresses.contains(peerName) ? peerName : QString(), peerAddress);
+            peer = preparePeer(channel, knownAddresses.contains(peerNameOrAddress) ? peerNameOrAddress : QString(), peerAddress);
         }
         event->set();
         connectingEvents.remove(peerAddress);
