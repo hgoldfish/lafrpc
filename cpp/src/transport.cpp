@@ -147,6 +147,7 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
     QSharedPointer<SslSocket> ssl = convertSocketLikeToSslSocket(request);
     QSharedPointer<KcpSocket> kcp;
     if (!ssl.isNull()) {
+        qCDebug(logger) << ssl;
         const QByteArray &certPEM = ssl->peerCertificate().save(Ssl::Pem);
         const QByteArray &certHash = ssl->peerCertificate().digest(MessageDigest::Sha256);
         if (!certPEM.isEmpty() && !certHash.isEmpty()) {
@@ -239,6 +240,12 @@ QString TcpTransport::getAddressTemplate()
 }
 
 
+QString TcpTransport::name() const
+{
+    return QString::fromUtf8("TcpTransport");
+}
+
+
 bool TcpTransport::canHandle(const QString &address)
 {
     return address.startsWith("tcp://", Qt::CaseInsensitive);
@@ -248,7 +255,7 @@ bool TcpTransport::canHandle(const QString &address)
 QSharedPointer<SocketLike> SslTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
 {
     QSharedPointer<SslSocket> ssl(SslSocket::createConnection(host, port, sslConfig, nullptr, dnsCache));
-    if (ssl) {
+    if (!ssl.isNull()) {
         return asSocketLike(ssl);
     } else {
         return QSharedPointer<SocketLike>();
@@ -261,6 +268,12 @@ QSharedPointer<BaseStreamServer> SslTransport::createServer(const QString &, con
     QSharedPointer<BaseStreamServer> server(new SslServer<TcpTransportRequestHandler>(host, port, sslConfig));
     server->setUserData(this);
     return server;
+}
+
+
+QString SslTransport::name() const
+{
+    return QString::fromUtf8("SslTransport");
 }
 
 
@@ -337,6 +350,12 @@ QSharedPointer<BaseStreamServer> KcpTransport::createServer(const QString &, con
 }
 
 
+QString KcpTransport::name() const
+{
+    return QString::fromUtf8("KcpTransport");
+}
+
+
 bool KcpTransport::canHandle(const QString &address)
 {
     return address.startsWith("kcp://", Qt::CaseInsensitive);
@@ -373,6 +392,12 @@ QSharedPointer<BaseStreamServer> KcpSslTransport::createServer(const QString &, 
     QSharedPointer<BaseStreamServer> server(new SslKcpServerWithFilter(host, port, sslConfig));
     server->setUserData(this);
     return server;
+}
+
+
+QString KcpSslTransport::name() const
+{
+    return QString::fromUtf8("KcpSslTransport");
 }
 
 
@@ -564,6 +589,12 @@ QString HttpTransport::getAddressTemplate()
 }
 
 
+QString HttpTransport::name() const
+{
+    return QString::fromUtf8("HttpTransport");
+}
+
+
 bool HttpTransport::canHandle(const QString &address)
 {
     return address.startsWith("http://", Qt::CaseInsensitive);
@@ -622,6 +653,12 @@ QString HttpsTransport::getAddressTemplate()
 }
 
 
+QString HttpsTransport::name() const
+{
+    return QString::fromUtf8("HttpsTransport");
+}
+
+
 bool HttpsTransport::canHandle(const QString &address)
 {
     return address.startsWith("https://", Qt::CaseInsensitive);
@@ -663,6 +700,12 @@ QSharedPointer<BaseStreamServer> HttpSslTransport::createServer(const QString &a
 QString HttpSslTransport::getAddressTemplate()
 {
     return QString::fromLatin1("http+ssl://%1:%2");
+}
+
+
+QString HttpSslTransport::name() const
+{
+    return QString::fromUtf8("HttpSslTransport");
 }
 
 

@@ -225,8 +225,10 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerNameOrAddress)
             return peer;
         }
     }
+    QString peerName;
     QString peerAddress;
     if (knownAddresses.contains(peerNameOrAddress)) {
+        peerName = peerNameOrAddress;
         peerAddress = knownAddresses.value(peerNameOrAddress);
     } else if (peerNameOrAddress.contains(QString::fromLatin1("//"))){
         peerAddress = peerNameOrAddress;
@@ -237,7 +239,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerNameOrAddress)
         }
     } else {
 #ifdef DEUBG_RPC_PROTOCOL
-        qCDebug(logger) << "Rpc::connect() -> unknown address:" << peerName;
+        qCDebug(logger) << "Rpc::connect() -> unknown address:" << peerNameOrAddress;
 #endif
         return QSharedPointer<Peer>();
     }
@@ -248,7 +250,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerNameOrAddress)
         return QSharedPointer<Peer>();
     }
 #ifdef DEUBG_RPC_PROTOCOL
-    qCDebug(logger) << "Rpc::connect() -> connecting to" << peerAddress;
+    qCDebug(logger) << "Rpc::connect() -> connecting to" << peerAddress << "using transport" << transport->name();
 #endif
 
     QSharedPointer<qtng::Event> event;
@@ -274,7 +276,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerNameOrAddress)
             qCDebug(logger) << "Rpc::connect() -> can not connect to" << peerAddress;
 #endif
         } else {
-            peer = preparePeer(channel, knownAddresses.contains(peerNameOrAddress) ? peerNameOrAddress : QString(), peerAddress);
+            peer = preparePeer(channel, peerName, peerAddress);
         }
         event->set();
         connectingEvents.remove(peerAddress);
