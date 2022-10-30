@@ -6,7 +6,7 @@
 #include "../include/rpc_p.h"
 #include "../include/peer.h"
 
-static Q_LOGGING_CATEGORY(logger, "logger.transport")
+static Q_LOGGING_CATEGORY(logger, "lafrpc.transport")
 
 using namespace qtng;
 
@@ -147,7 +147,6 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
     QSharedPointer<SslSocket> ssl = convertSocketLikeToSslSocket(request);
     QSharedPointer<KcpSocket> kcp;
     if (!ssl.isNull()) {
-        qCDebug(logger) << ssl;
         const QByteArray &certPEM = ssl->peerCertificate().save(Ssl::Pem);
         const QByteArray &certHash = ssl->peerCertificate().digest(MessageDigest::Sha256);
         if (!certPEM.isEmpty() && !certHash.isEmpty()) {

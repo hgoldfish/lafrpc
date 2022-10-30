@@ -188,15 +188,15 @@ QList<bool> RpcPrivate::startServers(const QStringList &addresses, bool blocking
 
 QList<bool> RpcPrivate::stopServers(const QStringList &addresses)
 {
-    const QList<QString> *serverAddressList;
+    QList<QString> serverAddressList;
     QList<bool> result;
 
     if (addresses.isEmpty()) {
-        serverAddressList = &this->serverAddressList;
+        serverAddressList = this->serverAddressList;
     } else {
-        serverAddressList = &addresses;
+        serverAddressList = addresses;
     }
-    for (const QString &address: *serverAddressList) {
+    for (const QString &address: serverAddressList) {
         const QString &workerName = makeWorkerName(address);
         bool success = operations->kill(workerName);
         result.append(success);
@@ -214,6 +214,20 @@ void RpcPrivate::shutdown()
     }
     peers.clear();
     operations->killall();
+}
+
+
+bool RpcPrivate::waitServers()
+{
+    QList<bool> result;
+    for (const QString &address: this->serverAddressList) {
+        const QString &workerName = makeWorkerName(address);
+        bool success = operations->join(workerName);
+        result.append(success);
+    }
+    // need not remove one by one.
+    this->serverAddressList.clear();
+    return true;
 }
 
 
@@ -611,6 +625,13 @@ void Rpc::shutdown()
 {
     Q_D(Rpc);
     d->shutdown();
+}
+
+
+bool Rpc::waitServers()
+{
+    Q_D(Rpc);
+    return d->waitServers();
 }
 
 

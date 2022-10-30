@@ -25,6 +25,7 @@ public:
     QList<bool> startServers(const QStringList &addresses, bool blocking);
     QList<bool> stopServers(const QStringList &addresses = QStringList());
     void shutdown();
+    bool waitServers();
     QSharedPointer<Peer> connect(const QString &peerName);
     QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray &connectionId);
     QSharedPointer<qtng::SocketLike> takeRawSocket(const QString &peerName, const QByteArray &connectionId);

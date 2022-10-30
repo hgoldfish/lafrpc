@@ -70,6 +70,7 @@ public:
     QList<bool> stopServers(const QStringList &addresses = QStringList());
     bool stopServer(const QString &address);
     void shutdown();
+    bool waitServers();
 
     // connect to the peer, got raw socket.
     QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &peerName, QByteArray &connectionId);

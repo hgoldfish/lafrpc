@@ -319,13 +319,10 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     try {
         response = waiter->wait();
         waiters.remove(request.id);
-    } catch (CoroutineExitException &) {
+    } catch (CoroutineException &) {
         waiters.remove(request.id);
         throw;
     } catch(RpcException &) {
-        waiters.remove(request.id);
-        throw;
-    } catch (Timeout &e) {
         waiters.remove(request.id);
         throw;
     } catch (std::exception &e) {
