@@ -414,7 +414,7 @@ void PeerPrivate::handlePacket()
         } else if (what == GOT_RESPONSE && response->isOk()) {
             QSharedPointer<ValueEvent<QSharedPointer<Response>>> waiter = waiters.value(response->id);
             if (waiter.isNull()) {
-                qCDebug(logger) << "received a response from server, but waiter is gone: " << response->id;
+                // qCDebug(logger) << "received a response from server, but waiter is gone: " << response->id;
             } else {
                 waiter->send(response);
             }
