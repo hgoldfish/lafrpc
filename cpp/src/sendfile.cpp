@@ -1,12 +1,12 @@
-#include <functional>
-#include <QtCore/qfileinfo.h>
-#include <QtCore/qdebug.h>
-#include <QtCore/qcryptographichash.h>
-#include <QtCore/qbuffer.h>
-#include <QtCore/qloggingcategory.h>
 #include "../include/sendfile.h"
+#include <QtCore/qbuffer.h>
+#include <QtCore/qcryptographichash.h>
+#include <QtCore/qdebug.h>
+#include <QtCore/qfileinfo.h>
+#include <QtCore/qloggingcategory.h>
+#include <functional>
 
-static Q_LOGGING_CATEGORY(logger, "lafrpc.sendfile")
+static Q_LOGGING_CATEGORY(logger, "lafrpc.sendfile");
 using namespace qtng;
 const static qint64 BLOCK_SIZE = 1024 * 32;
 
@@ -18,9 +18,11 @@ public:
     RpcFilePrivate(RpcFile *q);
 public:
     bool sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback);
-    bool recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback, const QByteArray &header);
+    bool recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback,
+                            const QByteArray &header);
     bool sendfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback);
-    bool recvfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback, const QByteArray &header);
+    bool recvfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback,
+                              const QByteArray &header);
 public:
     QString filePath;
     QString name;
@@ -32,20 +34,23 @@ public:
 private:
     RpcFile * const q_ptr;
     Q_DECLARE_PUBLIC(RpcFile)
-
 };
 
-
 RpcFilePrivate::RpcFilePrivate(RpcFile *q)
-    : size(0), atime(0), mtime(0), ctime(0), q_ptr(q) {}
-
-
+    : size(0)
+    , atime(0)
+    , mtime(0)
+    , ctime(0)
+    , q_ptr(q)
+{
+}
 
 bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback)
 {
     Q_Q(RpcFile);
     if (size == 0) {
-        if (progressCallback) progressCallback(0, 0, 0);
+        if (progressCallback)
+            progressCallback(0, 0, 0);
         return true;
     }
     q->channel->setCapacity(32);
@@ -99,12 +104,13 @@ bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
     return true;
 }
 
-
-bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback, const QByteArray &header)
+bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback,
+                                        const QByteArray &header)
 {
     Q_Q(RpcFile);
     if (size == 0) {
-        if (progressCallback) progressCallback(0, 0, 0);
+        if (progressCallback)
+            progressCallback(0, 0, 0);
         return true;
     }
     q->channel->setCapacity(32);
@@ -143,7 +149,8 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
         while (count < size) {
             const QByteArray &buf = q->channel->recvPacket();
             if (buf.isEmpty()) {
-                qCWarning(logger) << "rpc file receiving error." << q->channel->errorString();;
+                qCWarning(logger) << "rpc file receiving error." << q->channel->errorString();
+                ;
                 return false;
             }
             qint64 writtenBytes = f->write(buf);
@@ -172,12 +179,12 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
     return true;
 }
 
-
 bool RpcFilePrivate::sendfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback)
 {
     Q_Q(RpcFile);
     if (size == 0) {
-        if (progressCallback) progressCallback(-1, 0, 0);
+        if (progressCallback)
+            progressCallback(-1, 0, 0);
         return false;
     }
     quint64 count = 0;
@@ -217,12 +224,13 @@ bool RpcFilePrivate::sendfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::P
     return true;
 }
 
-
-bool RpcFilePrivate::recvfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback, const QByteArray &header)
+bool RpcFilePrivate::recvfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback,
+                                          const QByteArray &header)
 {
     Q_Q(RpcFile);
     if (size == 0) {
-        if (progressCallback) progressCallback(0, 0, 0);
+        if (progressCallback)
+            progressCallback(0, 0, 0);
         return true;
     }
     quint64 count = static_cast<quint64>(header.size());
@@ -271,9 +279,8 @@ bool RpcFilePrivate::recvfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::P
     return true;
 }
 
-
 RpcFile::RpcFile(const QString &filePath, bool withHash)
-    :d_ptr(new RpcFilePrivate(this))
+    : d_ptr(new RpcFilePrivate(this))
 {
     Q_D(RpcFile);
     QFileInfo fileInfo(filePath);
@@ -294,18 +301,15 @@ RpcFile::RpcFile(const QString &filePath, bool withHash)
     }
 }
 
-
 RpcFile::RpcFile()
-    :d_ptr(new RpcFilePrivate(this))
+    : d_ptr(new RpcFilePrivate(this))
 {
 }
-
 
 RpcFile::~RpcFile()
 {
     delete d_ptr;
 }
-
 
 static QByteArray calculateHash(const QString &filePath)
 {
@@ -318,7 +322,6 @@ static QByteArray calculateHash(const QString &filePath)
     return hasher.result();
 }
 
-
 bool RpcFile::calculateHash()
 {
     Q_D(RpcFile);
@@ -326,9 +329,8 @@ bool RpcFile::calculateHash()
         return false;
     }
     QString filePath = d->filePath;
-    const QByteArray &hash = callInThread<QByteArray>([filePath] () -> QByteArray {
-        return LAFRPC_NAMESPACE::calculateHash(filePath);
-    });
+    const QByteArray &hash =
+            callInThread<QByteArray>([filePath]() -> QByteArray { return LAFRPC_NAMESPACE::calculateHash(filePath); });
     if (hash.isEmpty()) {
         return false;
     } else {
@@ -337,13 +339,11 @@ bool RpcFile::calculateHash()
     }
 }
 
-
 bool RpcFile::isValid() const
 {
     Q_D(const RpcFile);
     return !d->name.isEmpty();
 }
-
 
 bool RpcFile::writeToPath(const QString &path, RpcFile::ProgressCallback progressCallback)
 {
@@ -358,7 +358,6 @@ bool RpcFile::writeToPath(const QString &path, RpcFile::ProgressCallback progres
     return writeTo(FileLike::rawFile(f), progressCallback);
 }
 
-
 bool RpcFile::readFromPath(const QString &path, RpcFile::ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
@@ -372,7 +371,6 @@ bool RpcFile::readFromPath(const QString &path, RpcFile::ProgressCallback progre
     return readFrom(FileLike::rawFile(f), progressCallback);
 }
 
-
 bool RpcFile::readFromPath(ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
@@ -384,7 +382,6 @@ bool RpcFile::readFromPath(ProgressCallback progressCallback)
     }
     return readFromPath(d->filePath, progressCallback);
 }
-
 
 bool RpcFile::writeTo(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback)
 {
@@ -399,7 +396,6 @@ bool RpcFile::writeTo(QSharedPointer<FileLike> f, RpcFile::ProgressCallback prog
     }
 }
 
-
 bool RpcFile::readFrom(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
@@ -412,7 +408,6 @@ bool RpcFile::readFrom(QSharedPointer<FileLike> f, RpcFile::ProgressCallback pro
         return d->sendfileViaRawSocket(f, progressCallback);
     }
 }
-
 
 bool RpcFile::sendall(const QByteArray &data, ProgressCallback progressCallback)
 {
@@ -427,7 +422,6 @@ bool RpcFile::sendall(const QByteArray &data, ProgressCallback progressCallback)
     }
 }
 
-
 bool RpcFile::recvall(QByteArray &data, ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
@@ -440,7 +434,6 @@ bool RpcFile::recvall(QByteArray &data, ProgressCallback progressCallback)
         return d->recvfileViaRawSocket(FileLike::bytes(&data), progressCallback, QByteArray());
     }
 }
-
 
 QVariantMap RpcFile::saveState()
 {
@@ -457,23 +450,28 @@ QVariantMap RpcFile::saveState()
     return state;
 }
 
-
 bool RpcFile::restoreState(const QVariantMap &state)
 {
     Q_D(RpcFile);
     bool ok;
-#define CHECKOK(valid, field) if (!valid) { qDebug("can not restore %s.", field); \
-    return false; \
-}
-    d->name = state.value("name").toString(); CHECKOK(!d->name.isEmpty(), "RpcFile.name");
-    d->size = state.value("size").toULongLong(&ok); CHECKOK(ok, "RpcFile.size");
-    d->atime = state.value("atime").toULongLong(&ok); CHECKOK(ok, "RpcFile.atime");
-    d->ctime = state.value("ctime").toULongLong(&ok); CHECKOK(ok, "RpcFile.ctime");
-    d->mtime = state.value("mtime").toULongLong(&ok); CHECKOK(ok, "RpcFile.mtime");
+#define CHECKOK(valid, field)             \
+  if (!valid) {                           \
+    qDebug("can not restore %s.", field); \
+    return false;                         \
+  }
+    d->name = state.value("name").toString();
+    CHECKOK(!d->name.isEmpty(), "RpcFile.name");
+    d->size = state.value("size").toULongLong(&ok);
+    CHECKOK(ok, "RpcFile.size");
+    d->atime = state.value("atime").toULongLong(&ok);
+    CHECKOK(ok, "RpcFile.atime");
+    d->ctime = state.value("ctime").toULongLong(&ok);
+    CHECKOK(ok, "RpcFile.ctime");
+    d->mtime = state.value("mtime").toULongLong(&ok);
+    CHECKOK(ok, "RpcFile.mtime");
     d->hash = state.value("hash").toByteArray();
     return true;
 }
-
 
 QString RpcFile::name() const
 {
@@ -481,13 +479,11 @@ QString RpcFile::name() const
     return d->name;
 }
 
-
 void RpcFile::setName(const QString &name)
 {
     Q_D(RpcFile);
     d->name = name;
 }
-
 
 quint64 RpcFile::size() const
 {
@@ -495,13 +491,11 @@ quint64 RpcFile::size() const
     return d->size;
 }
 
-
 void RpcFile::setSize(quint64 size)
 {
     Q_D(RpcFile);
     d->size = size;
 }
-
 
 QDateTime RpcFile::modified() const
 {
@@ -509,13 +503,11 @@ QDateTime RpcFile::modified() const
     return QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(d->mtime));
 }
 
-
 void RpcFile::setModified(const QDateTime &dt)
 {
     Q_D(RpcFile);
     d->mtime = static_cast<quint64>(dt.toMSecsSinceEpoch());
 }
-
 
 QDateTime RpcFile::created() const
 {
@@ -523,13 +515,11 @@ QDateTime RpcFile::created() const
     return QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(d->ctime));
 }
 
-
 void RpcFile::setCreated(const QDateTime &dt)
 {
     Q_D(RpcFile);
     d->ctime = static_cast<quint64>(dt.toMSecsSinceEpoch());
 }
-
 
 QDateTime RpcFile::lastAccess() const
 {
@@ -537,13 +527,11 @@ QDateTime RpcFile::lastAccess() const
     return QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(d->atime));
 }
 
-
 void RpcFile::setLastAccess(const QDateTime &dt)
 {
     Q_D(RpcFile);
     d->atime = static_cast<quint64>(dt.toMSecsSinceEpoch());
 }
-
 
 QByteArray RpcFile::hash() const
 {
@@ -551,12 +539,10 @@ QByteArray RpcFile::hash() const
     return d->hash;
 }
 
-
 void RpcFile::setHash(const QByteArray &hash)
 {
     Q_D(RpcFile);
     d->hash = hash;
 }
-
 
 END_LAFRPC_NAMESPACE

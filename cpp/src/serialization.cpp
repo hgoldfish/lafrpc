@@ -1,46 +1,35 @@
-#include <QtCore/qjsondocument.h>
-#include <QtCore/qjsonvalue.h>
-#include <QtCore/qjsonarray.h>
-#include <QtCore/qjsonobject.h>
-#include <QtCore/qdatastream.h>
-#include <QtCore/qendian.h>
-#include <QtCore/qdebug.h>
 #include "../include/serialization.h"
+#include <QtCore/qdatastream.h>
+#include <QtCore/qdebug.h>
+#include <QtCore/qendian.h>
+#include <QtCore/qjsonarray.h>
+#include <QtCore/qjsondocument.h>
+#include <QtCore/qjsonobject.h>
+#include <QtCore/qjsonvalue.h>
 
 BEGIN_LAFRPC_NAMESPACE
 
 const QString Serialization::SpecialSidKey = "__laf_sid__";
 QMap<QString, detail::SerializableInfo> Serialization::classes;
 namespace detail {
-    QList<std::function<void(const QVariant &)> > exceptionRaisers;
-    QList<std::function<QSharedPointer<UseStream>(const QVariant &)> > useStreamConvertors;
-}
+QList<std::function<void(const QVariant &)>> exceptionRaisers;
+QList<std::function<QSharedPointer<UseStream>(const QVariant &)>> useStreamConvertors;
+}  // namespace detail
 
-Serialization::~Serialization()
-{
-
-}
-
+Serialization::~Serialization() { }
 
 QVariant Serialization::saveState(const QVariant &obj)
 {
     QVariant::Type type = obj.type();
-    if (type == QVariant::Int
-            || type == QVariant::Double
-            || type == QVariant::String
-            || type == QVariant::Bool
-            || type == QVariant::ByteArray
-            || type == QVariant::LongLong
-            || type == QVariant::UInt
-            || type == QVariant::ULongLong
-            || type == QVariant::DateTime
-            || type == QVariant::Invalid
-            || type == QVariant::StringList) {
+    if (type == QVariant::Int || type == QVariant::Double || type == QVariant::String || type == QVariant::Bool
+        || type == QVariant::ByteArray || type == QVariant::LongLong || type == QVariant::UInt
+        || type == QVariant::ULongLong || type == QVariant::DateTime || type == QVariant::Invalid
+        || type == QVariant::StringList) {
         return obj;
     } else if (type == QVariant::List) {
         const QVariantList &l = obj.toList();
         QVariantList result;
-        for (const QVariant &e: l) {
+        for (const QVariant &e : l) {
             result.append(saveState(e));
         }
         return result;
@@ -52,11 +41,12 @@ QVariant Serialization::saveState(const QVariant &obj)
         }
         return result;
     } else {
-        for (QMap<QString, detail::SerializableInfo>::const_iterator itor = classes.constBegin(); itor != classes.constEnd(); ++itor) {
+        for (QMap<QString, detail::SerializableInfo>::const_iterator itor = classes.constBegin();
+             itor != classes.constEnd(); ++itor) {
             const detail::SerializableInfo &info = itor.value();
             if (info.metaTypeId == obj.userType()) {
                 void *p = info.serializer->toVoid(obj);
-                if(!p) {
+                if (!p) {
                     return QVariant();
                 }
                 const QVariantMap &d = info.serializer->saveState(p);
@@ -76,22 +66,15 @@ QVariant Serialization::saveState(const QVariant &obj)
 QVariant Serialization::restoreState(const QVariant &data)
 {
     QVariant::Type type = data.type();
-    if (type == QVariant::Int
-            || type == QVariant::Double
-            || type == QVariant::String
-            || type == QVariant::Bool
-            || type == QVariant::ByteArray
-            || type == QVariant::LongLong
-            || type == QVariant::UInt
-            || type == QVariant::ULongLong
-            || type == QVariant::DateTime
-            || type == QVariant::Invalid
-            || type == QVariant::StringList) {
+    if (type == QVariant::Int || type == QVariant::Double || type == QVariant::String || type == QVariant::Bool
+        || type == QVariant::ByteArray || type == QVariant::LongLong || type == QVariant::UInt
+        || type == QVariant::ULongLong || type == QVariant::DateTime || type == QVariant::Invalid
+        || type == QVariant::StringList) {
         return data;
     } else if (type == QVariant::List) {
         const QVariantList &l = data.toList();
         QVariantList result;
-        for (const QVariant &e: l) {
+        for (const QVariant &e : l) {
             result.append(restoreState(e));
         }
         return result;
@@ -128,23 +111,16 @@ QVariant Serialization::restoreState(const QVariant &data)
 QVariant convertDateTime(const QVariant &obj)
 {
     QVariant::Type type = obj.type();
-    if (type == QVariant::Int
-            || type == QVariant::Double
-            || type == QVariant::String
-            || type == QVariant::Bool
-            || type == QVariant::ByteArray
-            || type == QVariant::LongLong
-            || type == QVariant::UInt
-            || type == QVariant::ULongLong
-            || type == QVariant::Invalid
-            || type == QVariant::StringList) {
+    if (type == QVariant::Int || type == QVariant::Double || type == QVariant::String || type == QVariant::Bool
+        || type == QVariant::ByteArray || type == QVariant::LongLong || type == QVariant::UInt
+        || type == QVariant::ULongLong || type == QVariant::Invalid || type == QVariant::StringList) {
         return obj;
     } else if (type == QVariant::DateTime) {
         return obj.toDateTime().toString(Qt::ISODate);
     } else if (type == QVariant::List) {
         const QVariantList &l = obj.toList();
         QVariantList result;
-        for (const QVariant &e: l) {
+        for (const QVariant &e : l) {
             result.append(convertDateTime(e));
         }
         return result;
@@ -197,7 +173,6 @@ QVariant JsonSerialization::unpack(const QByteArray &data)
     }
 }
 
-
 QByteArray DataStreamSerialization::pack(const QVariant &obj)
 {
     QByteArray buf;
@@ -209,7 +184,6 @@ QByteArray DataStreamSerialization::pack(const QVariant &obj)
     }
     return buf;
 }
-
 
 QVariant DataStreamSerialization::unpack(const QByteArray &data)
 {
@@ -223,8 +197,6 @@ QVariant DataStreamSerialization::unpack(const QByteArray &data)
     return restoreState(v);
 }
 
-
-
 QByteArray MessagePackSerialization::pack(const QVariant &obj)
 {
     QByteArray buf;
@@ -236,7 +208,6 @@ QByteArray MessagePackSerialization::pack(const QVariant &obj)
     return buf;
 }
 
-
 QVariant MessagePackSerialization::unpack(const QByteArray &data)
 {
     qtng::MsgPackStream ds(data);
@@ -247,6 +218,5 @@ QVariant MessagePackSerialization::unpack(const QByteArray &data)
     }
     return restoreState(v);
 }
-
 
 END_LAFRPC_NAMESPACE

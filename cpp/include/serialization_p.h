@@ -11,53 +11,39 @@ class BaseSerializer
 public:
     virtual void *create() = 0;
     virtual QVariantMap saveState(void *p) = 0;
-    virtual bool restoreState(void *p, const QVariantMap& state) = 0;
+    virtual bool restoreState(void *p, const QVariantMap &state) = 0;
     virtual void *toVoid(const QVariant &v) = 0;
     virtual QVariant fromVoid(void *p) = 0;
 };
 
-
 template<typename T>
-class Serializer: public BaseSerializer
+class Serializer : public BaseSerializer
 {
 public:
-    virtual void *create() override
-    {
-        return reinterpret_cast<void*>(new T());
-    }
+    virtual void *create() override { return reinterpret_cast<void *>(new T()); }
 
-    virtual QVariantMap saveState(void *p) override
-    {
-        return reinterpret_cast<T*>(p)->saveState();
-    }
+    virtual QVariantMap saveState(void *p) override { return reinterpret_cast<T *>(p)->saveState(); }
 
-    virtual bool restoreState(void *p, const QVariantMap& state) override
+    virtual bool restoreState(void *p, const QVariantMap &state) override
     {
-        return reinterpret_cast<T*>(p)->restoreState(state);
+        return reinterpret_cast<T *>(p)->restoreState(state);
     }
 
     virtual void *toVoid(const QVariant &v) override
     {
         QSharedPointer<T> p = v.value<QSharedPointer<T>>();
-        return reinterpret_cast<void*>(p.data());
+        return reinterpret_cast<void *>(p.data());
     }
 
     virtual QVariant fromVoid(void *p) override
     {
-        return QVariant::fromValue(QSharedPointer<T>(reinterpret_cast<T*>(p)));
+        return QVariant::fromValue(QSharedPointer<T>(reinterpret_cast<T *>(p)));
     }
 
-    static QString lafrpcKey()
-    {
-        return T::lafrpcKey();
-    }
+    static QString lafrpcKey() { return T::lafrpcKey(); }
 
-    static QString className()
-    {
-        return QString::fromLatin1(typeid(T).name());
-    }
+    static QString className() { return QString::fromLatin1(typeid(T).name()); }
 };
-
 
 struct SerializableInfo
 {
@@ -66,10 +52,8 @@ struct SerializableInfo
     QSharedPointer<BaseSerializer> serializer;
 };
 
-
-extern QList<std::function<void(const QVariant &)> > exceptionRaisers;
-extern QList<std::function<QSharedPointer<UseStream>(const QVariant &)> > useStreamConvertors;
-
+extern QList<std::function<void(const QVariant &)>> exceptionRaisers;
+extern QList<std::function<QSharedPointer<UseStream>(const QVariant &)>> useStreamConvertors;
 
 template<typename T>
 void tryRaiseException(const QVariant &v)
@@ -80,7 +64,6 @@ void tryRaiseException(const QVariant &v)
     }
 }
 
-
 template<typename T>
 QSharedPointer<UseStream> tryConvertUseStream(const QVariant &v)
 {
@@ -90,22 +73,21 @@ QSharedPointer<UseStream> tryConvertUseStream(const QVariant &v)
             return qSharedPointerDynamicCast<UseStream>(p);
         }
     }
-	return QSharedPointer<UseStream>();
+    return QSharedPointer<UseStream>();
 }
 
-
 template<typename T>
-inline void registerExceptionClass(T * = 0, typename std::enable_if<std::is_base_of<RpcRemoteException, T>::value>::type * = 0)
+inline void registerExceptionClass(T * = 0,
+                                   typename std::enable_if<std::is_base_of<RpcRemoteException, T>::value>::type * = 0)
 {
     exceptionRaisers.append(tryRaiseException<T>);
 }
 
-
 template<typename T>
-inline void registerExceptionClass(T * = 0, typename std::enable_if<!(std::is_base_of<RpcRemoteException, T>::value)>::type * = 0)
+inline void
+registerExceptionClass(T * = 0, typename std::enable_if<!(std::is_base_of<RpcRemoteException, T>::value)>::type * = 0)
 {
 }
-
 
 template<typename T>
 inline void registerUseStreamClass(T * = 0, typename std::enable_if<std::is_base_of<UseStream, T>::value>::type * = 0)
@@ -113,14 +95,13 @@ inline void registerUseStreamClass(T * = 0, typename std::enable_if<std::is_base
     useStreamConvertors.append(tryConvertUseStream<T>);
 }
 
-
 template<typename T>
-inline void registerUseStreamClass(T * = 0, typename std::enable_if<!(std::is_base_of<UseStream, T>::value)>::type * = 0)
+inline void registerUseStreamClass(T * = 0,
+                                   typename std::enable_if<!(std::is_base_of<UseStream, T>::value)>::type * = 0)
 {
 }
 
-
-} // namespace detail
+}  // namespace detail
 
 END_LAFRPC_NAMESPACE
 

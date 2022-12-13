@@ -15,15 +15,15 @@ struct HeaderCallback
     virtual bool auth(Peer *peer, const QString &methodName, const QVariantMap &header) = 0;
 };
 
-
 struct LoggingCallback
 {
     virtual ~LoggingCallback();
-    virtual void calling(Peer *peer, const QString &methodName, const QVariantList &args, const QVariantMap &kwargs) = 0;
-    virtual void success(Peer *peer, const QString &methodName, const QVariantList &args, const QVariantMap &kwargs, const QVariant &result) = 0;
-    virtual void failed(Peer *peer, const QString &methodName , const QVariantList &args, const QVariantMap &kwargs) = 0;
+    virtual void calling(Peer *peer, const QString &methodName, const QVariantList &args,
+                         const QVariantMap &kwargs) = 0;
+    virtual void success(Peer *peer, const QString &methodName, const QVariantList &args, const QVariantMap &kwargs,
+                         const QVariant &result) = 0;
+    virtual void failed(Peer *peer, const QString &methodName, const QVariantList &args, const QVariantMap &kwargs) = 0;
 };
-
 
 struct KcpFilter
 {
@@ -31,18 +31,16 @@ struct KcpFilter
     virtual bool filter(qtng::KcpSocket *socket, char *data, qint32 *len, qtng::HostAddress *addr, quint16 *port) = 0;
 };
 
-
-enum SerializationType{
+enum SerializationType {
     MessagePack,
     Json,
     DataStream,
 };
 
-
 class RpcPrivate;
 class Serialization;
 class RpcBuilder;
-class Rpc: public RegisterServiceMixin<QObject>
+class Rpc : public RegisterServiceMixin<QObject>
 {
     Q_OBJECT
 public:
@@ -115,7 +113,8 @@ public:
     bool handleRequest(QSharedPointer<qtng::SocketLike> connection, const QString &address);
 
     // turn a data channel into rpc peer.
-    QSharedPointer<Peer> preparePeer(QSharedPointer<qtng::DataChannel> channel, const QString &name, const QString &address);
+    QSharedPointer<Peer> preparePeer(QSharedPointer<qtng::DataChannel> channel, const QString &name,
+                                     const QString &address);
 public:
     static RpcBuilder builder(SerializationType serialization);
 private:
@@ -126,7 +125,6 @@ private:
     friend class RpcBuilder;
     friend class Transport;
 };
-
 
 class RpcBuilder
 {
@@ -152,5 +150,4 @@ private:
 
 END_LAFRPC_NAMESPACE
 
-#endif //LAFRPC_RPC_H
-
+#endif  // LAFRPC_RPC_H

@@ -1,32 +1,27 @@
-#include <QtCore/qdebug.h>
 #include "../include/senddir.h"
+#include <QtCore/qdebug.h>
 
 using namespace qtng;
-
 
 BEGIN_LAFRPC_NAMESPACE
 
 RpcDirFileEntry::RpcDirFileEntry()
     : size(0)
     , isdir(false)
-{}
+{
+}
 
-
-RpcDirFileProvider::~RpcDirFileProvider()
-{}
-
+RpcDirFileProvider::~RpcDirFileProvider() { }
 
 bool RpcDirFileProvider::createDirectory(const QString &)
 {
     return false;
 }
 
-
 bool RpcDirFileProvider::updateTimes(const QString &, const QDateTime &, const QDateTime &, const QDateTime &)
 {
     return false;
 }
-
 
 QString NativeRpcDirFileProvider::makePath(const QString &filePath)
 {
@@ -48,7 +43,6 @@ QString NativeRpcDirFileProvider::makePath(const QString &filePath)
     return fullFilePath;
 }
 
-
 QSharedPointer<FileLike> NativeRpcDirFileProvider::getFile(const QString &filePath, QIODevice::OpenMode mode)
 {
     const QString fullFilePath = makePath(filePath);
@@ -63,7 +57,6 @@ QSharedPointer<FileLike> NativeRpcDirFileProvider::getFile(const QString &filePa
     return FileLike::rawFile(file);
 }
 
-
 bool NativeRpcDirFileProvider::createDirectory(const QString &dirPath)
 {
     const QString fullDirPath = makePath(dirPath);
@@ -73,25 +66,24 @@ bool NativeRpcDirFileProvider::createDirectory(const QString &dirPath)
     return rootDir.mkpath(dirPath);
 }
 
-
-bool NativeRpcDirFileProvider::updateTimes(const QString &filePath, const QDateTime &created, const QDateTime &lastModified, const QDateTime &lastAccess)
+bool NativeRpcDirFileProvider::updateTimes(const QString &filePath, const QDateTime &created,
+                                           const QDateTime &lastModified, const QDateTime &lastAccess)
 {
     const QString fullFilePath = makePath(filePath);
     if (fullFilePath.isEmpty()) {
         return false;
     }
     if (created.isValid()) {
-        //TODO update created time.
+        // TODO update created time.
     }
     if (lastModified.isValid()) {
-        //TODO update last modified time.
+        // TODO update last modified time.
     }
     if (lastAccess.isValid()) {
-        //TODO update last access time.
+        // TODO update last access time.
     }
     return true;
 }
-
 
 class RpcDirPrivate
 {
@@ -113,17 +105,17 @@ private:
     Q_DECLARE_PUBLIC(RpcDir)
 };
 
-
 RpcDirPrivate::RpcDirPrivate(RpcDir *q)
-    : size(0), q_ptr(q)
-{}
-
+    : size(0)
+    , q_ptr(q)
+{
+}
 
 bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback)
 {
     Q_Q(RpcDir);
     quint64 totalWritten = 0;
-    for (const RpcDirFileEntry &entry: entries) {
+    for (const RpcDirFileEntry &entry : entries) {
         if (entry.isdir) {
             if (!provider->createDirectory(entry.path)) {
                 if (progressCallback)
@@ -162,18 +154,21 @@ bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir:
                 const QByteArray &buf = channel->recvPacket();
                 if (buf.isEmpty()) {
                     if (progressCallback)
-                        progressCallback(CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
+                        progressCallback(
+                                CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
                     return false;
                 }
                 if (file->write(buf.data(), buf.size()) != buf.size()) {
                     if (progressCallback)
-                        progressCallback(CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
+                        progressCallback(
+                                CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
                     return false;
                 }
                 fileWritten += static_cast<quint64>(buf.size());
                 totalWritten += static_cast<quint64>(buf.size());
                 if (progressCallback) {
-                    bool keepGoing = progressCallback(CallbackInfo(entry.path, buf.size(), fileWritten, entry.size, totalWritten, this->size));
+                    bool keepGoing = progressCallback(
+                            CallbackInfo(entry.path, buf.size(), fileWritten, entry.size, totalWritten, this->size));
                     if (!keepGoing) {
                         return true;
                     }
@@ -187,7 +182,8 @@ bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir:
                 bool ok = provider->updateTimes(entry.path, entry.created, entry.lastModified, entry.lastAccess);
                 if (!ok) {
                     if (progressCallback)
-                        progressCallback(CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
+                        progressCallback(
+                                CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
                     return false;
                 }
             }
@@ -195,7 +191,6 @@ bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir:
     }
     return true;
 }
-
 
 bool RpcDirPrivate::readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback)
 {
@@ -205,7 +200,7 @@ bool RpcDirPrivate::readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir
     }
     quint64 totalRead = 0;
     QByteArray buf(1024 * 64, Qt::Uninitialized);
-    for (const RpcDirFileEntry &entry: entries) {
+    for (const RpcDirFileEntry &entry : entries) {
         if (entry.isdir || entry.size == 0) {
             if (progressCallback)
                 progressCallback(CallbackInfo(entry.path, 0, 0, 0, totalRead, this->size));
@@ -239,19 +234,19 @@ bool RpcDirPrivate::readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir
                 fileRead += static_cast<quint64>(bs);
                 totalRead += static_cast<quint64>(bs);
                 if (progressCallback) {
-                    bool keepGoing = progressCallback(CallbackInfo(entry.path, bs, fileRead, entry.size, totalRead, this->size));
+                    bool keepGoing =
+                            progressCallback(CallbackInfo(entry.path, bs, fileRead, entry.size, totalRead, this->size));
                     if (!keepGoing) {
                         return true;
                     }
                 }
             }
-            channel->recvPacket(); // wait for remote closing the channel.
+            channel->recvPacket();  // wait for remote closing the channel.
         }
     }
 
     return true;
 }
-
 
 RpcDir::RpcDir(const QString &path)
     : d_ptr(new RpcDirPrivate(this))
@@ -273,7 +268,6 @@ RpcDir::RpcDir(const QString &path)
     }
 }
 
-
 RpcDir::RpcDir()
     : d_ptr(new RpcDirPrivate(this))
 {
@@ -284,19 +278,21 @@ RpcDir::~RpcDir()
     delete d_ptr;
 }
 
-
 struct PopulateResult
 {
-    PopulateResult() : totalSize(0) {}
+    PopulateResult()
+        : totalSize(0)
+    {
+    }
     QList<RpcDirFileEntry> entries;
     quint64 totalSize;
 };
 
-
 static void _populate(const QDir &dir, const QString &relativePath, PopulateResult &result)
 {
-    QDir::Filters filters = QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable | QDir::Executable | QDir::Hidden;
-    for (const QFileInfo &fileInfo: dir.entryInfoList(filters, QDir::DirsFirst)) {
+    QDir::Filters filters =
+            QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable | QDir::Executable | QDir::Hidden;
+    for (const QFileInfo &fileInfo : dir.entryInfoList(filters, QDir::DirsFirst)) {
         RpcDirFileEntry entry;
         const QString &name = fileInfo.fileName();
         if (Q_UNLIKELY(name.contains("/"))) {
@@ -320,7 +316,6 @@ static void _populate(const QDir &dir, const QString &relativePath, PopulateResu
     }
 }
 
-
 static PopulateResult populate(const QString &dirPath)
 {
     QList<RpcDirFileEntry> entries;
@@ -330,7 +325,6 @@ static PopulateResult populate(const QString &dirPath)
     return result;
 }
 
-
 bool RpcDir::populate()
 {
     Q_D(RpcDir);
@@ -338,14 +332,12 @@ bool RpcDir::populate()
         return false;
     }
     QString dirPath;
-    PopulateResult result = qtng::callInThread<PopulateResult>([dirPath] {
-        return LAFRPC_NAMESPACE::populate(dirPath);
-    });
+    PopulateResult result =
+            qtng::callInThread<PopulateResult>([dirPath] { return LAFRPC_NAMESPACE::populate(dirPath); });
     d->entries = result.entries;
     d->size = result.totalSize;
     return true;
 }
-
 
 bool RpcDir::isValid() const
 {
@@ -353,20 +345,17 @@ bool RpcDir::isValid() const
     return !d->name.isEmpty();
 }
 
-
 bool RpcDir::writeToPath(const QString &path, ProgressCallback progressCallback)
 {
     Q_D(RpcDir);
     return d->writeTo(QSharedPointer<NativeRpcDirFileProvider>::create(path), progressCallback);
 }
 
-
 bool RpcDir::readFromPath(const QString &path, ProgressCallback progressCallback)
 {
     Q_D(RpcDir);
     return d->readFrom(QSharedPointer<NativeRpcDirFileProvider>::create(path), progressCallback);
 }
-
 
 bool RpcDir::readFromPath(ProgressCallback progressCallback)
 {
@@ -377,13 +366,11 @@ bool RpcDir::readFromPath(ProgressCallback progressCallback)
     return d->readFrom(QSharedPointer<NativeRpcDirFileProvider>::create(d->dirPath), progressCallback);
 }
 
-
 bool RpcDir::writeTo(QSharedPointer<RpcDirFileProvider> provider, ProgressCallback progressCallback)
 {
     Q_D(RpcDir);
     return d->writeTo(provider, progressCallback);
 }
-
 
 bool RpcDir::readFrom(QSharedPointer<RpcDirFileProvider> provider, ProgressCallback progressCallback)
 {
@@ -391,13 +378,11 @@ bool RpcDir::readFrom(QSharedPointer<RpcDirFileProvider> provider, ProgressCallb
     return d->readFrom(provider, progressCallback);
 }
 
-
 QString RpcDir::name() const
 {
     Q_D(const RpcDir);
     return d->name;
 }
-
 
 void RpcDir::setName(const QString &name)
 {
@@ -405,13 +390,11 @@ void RpcDir::setName(const QString &name)
     d->name = name;
 }
 
-
 quint64 RpcDir::size() const
 {
     Q_D(const RpcDir);
     return d->size;
 }
-
 
 void RpcDir::setSize(quint64 size)
 {
@@ -419,13 +402,11 @@ void RpcDir::setSize(quint64 size)
     d->size = size;
 }
 
-
 QDateTime RpcDir::lastModified() const
 {
     Q_D(const RpcDir);
     return d->lastModified;
 }
-
 
 void RpcDir::setLastModified(const QDateTime &dt)
 {
@@ -433,13 +414,11 @@ void RpcDir::setLastModified(const QDateTime &dt)
     d->lastModified = dt;
 }
 
-
 QDateTime RpcDir::created() const
 {
     Q_D(const RpcDir);
     return d->created;
 }
-
 
 void RpcDir::setCreated(const QDateTime &dt)
 {
@@ -447,13 +426,11 @@ void RpcDir::setCreated(const QDateTime &dt)
     d->created = dt;
 }
 
-
 QDateTime RpcDir::lastAccess() const
 {
     Q_D(const RpcDir);
     return d->lastAccess;
 }
-
 
 void RpcDir::setLastAccess(const QDateTime &dt)
 {
@@ -461,20 +438,17 @@ void RpcDir::setLastAccess(const QDateTime &dt)
     d->lastAccess = dt;
 }
 
-
 QList<RpcDirFileEntry> RpcDir::entries() const
 {
     Q_D(const RpcDir);
     return d->entries;
 }
 
-
 void RpcDir::setEntries(const QList<RpcDirFileEntry> &entries)
 {
     Q_D(RpcDir);
     d->entries = entries;
 }
-
 
 QVariantMap RpcDir::saveState()
 {
@@ -492,7 +466,7 @@ QVariantMap RpcDir::saveState()
         state.insert("atime", d->lastAccess);
     }
     QVariantList entrieObjList;
-    for (const RpcDirFileEntry &entry: d->entries) {
+    for (const RpcDirFileEntry &entry : d->entries) {
         QVariantMap entryObj;
         entryObj.insert("path", entry.path);
         entryObj.insert("size", entry.size);
@@ -512,7 +486,6 @@ QVariantMap RpcDir::saveState()
     return state;
 }
 
-
 bool RpcDir::restoreState(const QVariantMap &state)
 {
     Q_D(RpcDir);
@@ -527,7 +500,7 @@ bool RpcDir::restoreState(const QVariantMap &state)
     d->lastAccess = state.value("atime").toDateTime();
     const QVariantList &entryObjList = state.value("entries").toList();
     d->entries.clear();
-    for (const QVariant &t: entryObjList) {
+    for (const QVariant &t : entryObjList) {
         const QVariantMap &entryObj = t.toMap();
         if (entryObj.isEmpty()) {
             qDebug() << "entry obj should not be empty.";

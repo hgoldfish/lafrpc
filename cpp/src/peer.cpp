@@ -1,13 +1,12 @@
-#include <QtCore/qmetaobject.h>
-#include <QtCore/qloggingcategory.h>
-#include "qtnetworkng.h"
-#include "../include/base.h"
 #include "../include/peer.h"
+#include "../include/base.h"
 #include "../include/rpc_p.h"
 #include "../include/serialization.h"
+#include "qtnetworkng.h"
+#include <QtCore/qloggingcategory.h>
+#include <QtCore/qmetaobject.h>
 
-static Q_LOGGING_CATEGORY(logger, "lafrpc.peer")
-using namespace qtng;
+static Q_LOGGING_CATEGORY(logger, "lafrpc.peer") using namespace qtng;
 
 #define DEUBG_RPC_PROTOCOL
 
@@ -27,7 +26,6 @@ inline QByteArray packRequest(const QSharedPointer<Serialization> &serialization
     return serialization->pack(QVariant::fromValue(l));
 }
 
-
 inline QByteArray packResponse(const QSharedPointer<Serialization> &serialization, const Response &response)
 {
     QVariantList l;
@@ -40,13 +38,12 @@ inline QByteArray packResponse(const QSharedPointer<Serialization> &serializatio
     return serialization->pack(QVariant::fromValue(l));
 }
 
-
 #define GOT_REQUEST 1
 #define GOT_RESPONSE 2
 #define GOT_NOTHING 3
 
 int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, const QByteArray &data,
-                                   Request *request, Response *response)
+                            Request *request, Response *response)
 {
     QVariant v;
     try {
@@ -55,13 +52,13 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         return GOT_NOTHING;
     }
 
-    if(v.type() != QVariant::List) {
+    if (v.type() != QVariant::List) {
         return GOT_NOTHING;
     }
     const QVariantList &l = v.toList();
     bool ok;
-    if(l.size() == 8) {
-        if(l[0].toInt(&ok) != 1) {
+    if (l.size() == 8) {
+        if (l[0].toInt(&ok) != 1) {
 #ifdef DEUBG_RPC_PROTOCOL
             qCDebug(logger) << "the first byte of request is not the number 1.";
 #endif
@@ -106,21 +103,20 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
     return GOT_NOTHING;
 }
 
-
 class PeerPrivate
 {
 public:
     typedef ValueEvent<QSharedPointer<Response>> Waiter;
 
-    PeerPrivate(const QString &name, const QSharedPointer<DataChannel> &channel,
-                   const QPointer<Rpc> &rpc, Peer *parent);
+    PeerPrivate(const QString &name, const QSharedPointer<DataChannel> &channel, const QPointer<Rpc> &rpc,
+                Peer *parent);
     ~PeerPrivate();
     void shutdown();
     QVariant call(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs);
     void handlePacket();
     void handleRequest(QSharedPointer<Request> request);
-    QVariant lookupAndCall(const QString &methodName, const QVariantList &args,
-                           const QVariantMap &kwargs, const QVariantMap &header);
+    QVariant lookupAndCall(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs,
+                           const QVariantMap &header);
 
     QMap<QByteArray, QSharedPointer<Waiter>> waiters;
     QString name;
@@ -136,9 +132,8 @@ public:
     bool broken;
 };
 
-
-PeerPrivate::PeerPrivate(const QString &name, const QSharedPointer<DataChannel> &channel,
-                               const QPointer<Rpc> &rpc,  Peer *parent)
+PeerPrivate::PeerPrivate(const QString &name, const QSharedPointer<DataChannel> &channel, const QPointer<Rpc> &rpc,
+                         Peer *parent)
     : name(name)
     , channel(channel)
     , rpc(rpc)
@@ -147,16 +142,14 @@ PeerPrivate::PeerPrivate(const QString &name, const QSharedPointer<DataChannel> 
     , q_ptr(parent)
     , broken(false)
 {
-    operations->spawn([this]{handlePacket();});
+    operations->spawn([this] { handlePacket(); });
 }
-
 
 PeerPrivate::~PeerPrivate()
 {
     shutdown();
     delete operations;
 }
-
 
 void PeerPrivate::shutdown()
 {
@@ -167,7 +160,8 @@ void PeerPrivate::shutdown()
     }
     broken = true;
     QSharedPointer<Response> emptyResponse(new Response());
-    for (QMap<QByteArray, QSharedPointer<Waiter>>::const_iterator itor = waiters.constBegin(); itor != waiters.constEnd(); ++itor) {
+    for (QMap<QByteArray, QSharedPointer<Waiter>>::const_iterator itor = waiters.constBegin();
+         itor != waiters.constEnd(); ++itor) {
         itor.value()->send(emptyResponse);
     }
     waiters.clear();
@@ -190,13 +184,11 @@ void PeerPrivate::shutdown()
     // XXX do not do this.
     // emit q->disconnected(q);
     q->clearServices();
-
 }
-
 
 static void raiseRpcRemoteException(const QVariant &v)
 {
-    for (std::function<void(const QVariant &v)> func: detail::exceptionRaisers) {
+    for (std::function<void(const QVariant &v)> func : detail::exceptionRaisers) {
         func(v);
     }
     QSharedPointer<RpcRemoteException> e = v.value<QSharedPointer<RpcRemoteException>>();
@@ -205,10 +197,9 @@ static void raiseRpcRemoteException(const QVariant &v)
     }
 }
 
-
 static QSharedPointer<UseStream> convertUseStream(const QVariant &v)
 {
-    for (std::function<QSharedPointer<UseStream>(const QVariant &)> f: detail::useStreamConvertors) {
+    for (std::function<QSharedPointer<UseStream>(const QVariant &)> f : detail::useStreamConvertors) {
         QSharedPointer<UseStream> p = f(v);
         if (!p.isNull()) {
             return p;
@@ -216,8 +207,6 @@ static QSharedPointer<UseStream> convertUseStream(const QVariant &v)
     }
     return QSharedPointer<UseStream>();
 }
-
-
 
 QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs)
 {
@@ -229,7 +218,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     }
 
     QSharedPointer<UseStream> streamFromClient;
-    for (const QVariant &v: args) {
+    for (const QVariant &v : args) {
         QSharedPointer<UseStream> p = convertUseStream(v);
         if (!p.isNull()) {
             if (!streamFromClient.isNull()) {
@@ -240,7 +229,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
             }
         }
     }
-    for (const QVariant &v: kwargs.values()) {
+    for (const QVariant &v : kwargs.values()) {
         QSharedPointer<UseStream> p = convertUseStream(v);
         if (!p.isNull()) {
             if (!streamFromClient.isNull()) {
@@ -269,7 +258,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         if (subChannelFromClient.isNull()) {
             throw RpcDisconnectedException(QString::fromUtf8("can not make sub channel."));
         }
-        if(broken || rpc.isNull()) {
+        if (broken || rpc.isNull()) {
             throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
         }
         QByteArray connectionId;
@@ -279,7 +268,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
             if (rawSocket.isNull() || connectionId.isEmpty()) {
                 qCDebug(logger) << "can not make raw socket to" << name;
             }
-            if(broken || rpc.isNull()) {
+            if (broken || rpc.isNull()) {
                 throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
             }
         }
@@ -292,7 +281,8 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
     QByteArray requestBytes = packRequest(rpc.data()->serialization(), request);
     if (requestBytes.isEmpty()) {
-        throw RpcSerializationException(QString::fromUtf8("can not serialize request while calling remote method: %1").arg(methodName));
+        throw RpcSerializationException(
+                QString::fromUtf8("can not serialize request while calling remote method: %1").arg(methodName));
     }
     if (broken || rpc.isNull()) {
         throw RpcDisconnectedException(QString::fromUtf8("rpc is gone."));
@@ -322,18 +312,20 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     } catch (CoroutineException &) {
         waiters.remove(request.id);
         throw;
-    } catch(RpcException &) {
+    } catch (RpcException &) {
         waiters.remove(request.id);
         throw;
     } catch (std::exception &e) {
         waiters.remove(request.id);
-        const QString &message = QString::fromUtf8("unknown error occurs while waiting response of remote method: `%1`").arg(methodName);
+        const QString &message =
+                QString::fromUtf8("unknown error occurs while waiting response of remote method: `%1`").arg(methodName);
         qCWarning(logger) << message << e.what();
         throw RpcInternalException(message);
     }
 
     if (response.isNull() || !response->isOk()) {
-        const QString &message = QString::fromUtf8("got empty response while waiting response of remote method: `%1`").arg(methodName);
+        const QString &message =
+                QString::fromUtf8("got empty response while waiting response of remote method: `%1`").arg(methodName);
         throw RpcDisconnectedException(message);
     }
 
@@ -366,7 +358,8 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
             }
             rawSocket = rpc->takeRawSocket(name, response->rawSocket);
             if (rawSocket.isNull()) {
-                qCWarning(logger) << "the response of" << methodName << "returns a raw socket, but is gone:" << response->rawSocket;
+                qCWarning(logger) << "the response of" << methodName
+                                  << "returns a raw socket, but is gone:" << response->rawSocket;
             }
         }
         streamFromServer->place = UseStream::ClientSide | UseStream::ValueOfResponse;
@@ -376,7 +369,6 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
     }
     return response->result;
 }
-
 
 void PeerPrivate::handlePacket()
 {
@@ -408,9 +400,7 @@ void PeerPrivate::handlePacket()
         QSharedPointer<Response> response(new Response());
         int what = unpackRequestOrResponse(rpc->serialization(), packet, request.data(), response.data());
         if (what == GOT_REQUEST && request->isOk()) {
-            operations->spawn([this, request] {
-                handleRequest(request);
-            });
+            operations->spawn([this, request] { handleRequest(request); });
         } else if (what == GOT_RESPONSE && response->isOk()) {
             QSharedPointer<ValueEvent<QSharedPointer<Response>>> waiter = waiters.value(response->id);
             if (waiter.isNull()) {
@@ -423,7 +413,6 @@ void PeerPrivate::handlePacket()
         }
     }
 }
-
 
 void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 {
@@ -443,20 +432,20 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
     }
     if (broken || rpc.isNull()) {
 #ifdef DEUBG_RPC_PROTOCOL
-            qCDebug(logger) << "rpc is gone where handling request.";
+        qCDebug(logger) << "rpc is gone where handling request.";
 #endif
         return;
     }
 
     QSharedPointer<UseStream> streamFromClient;
-    for (const QVariant &v: request->args) {
+    for (const QVariant &v : request->args) {
         streamFromClient = convertUseStream(v);
         if (!streamFromClient.isNull()) {
             break;
         }
     }
     if (streamFromClient.isNull()) {
-        for (const QVariant &v: request->kwargs.values()) {
+        for (const QVariant &v : request->kwargs.values()) {
             streamFromClient = convertUseStream(v);
             if (!streamFromClient.isNull()) {
                 break;
@@ -469,7 +458,8 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 
     if (!streamFromClient.isNull()) {
         if (request->channel == 0) {
-            qCWarning(logger) << "the request of" << request->methodName << "pass a use-stream parameter, but sent no channel.";
+            qCWarning(logger) << "the request of" << request->methodName
+                              << "pass a use-stream parameter, but sent no channel.";
             QSharedPointer<RpcRemoteException> e(new RpcRemoteException("bad channel"));
             response.exception.setValue(e);
         } else {
@@ -510,14 +500,14 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
             QSharedPointer<RpcRemoteException> e(new RpcRemoteException("unknown exception caught."));
             response.exception.setValue(e);
 #ifdef DEUBG_RPC_PROTOCOL
-            qCDebug(logger) << "unknown exception caught while lookup and call request method:" << request->methodName << request->args << request->kwargs << request->header;
+            qCDebug(logger) << "unknown exception caught while lookup and call request method:" << request->methodName
+                            << request->args << request->kwargs << request->header;
 #endif
         }
         if (broken || rpc.isNull()) {
             return;
         }
     }
-
 
     QSharedPointer<UseStream> streamFromServer;
     if (response.exception.isNull()) {
@@ -558,8 +548,8 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 
     const QByteArray &responseBytes = packResponse(rpc.data()->serialization(), response);
     if (responseBytes.isEmpty()) {
-       qCDebug(logger) << "can not serialize response.";
-       return;
+        qCDebug(logger) << "can not serialize response.";
+        return;
     }
 
     success = channel->sendPacket(responseBytes);
@@ -575,7 +565,6 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
         streamFromServer->ready.set();
     }
 }
-
 
 QByteArray removeNamespace(const QByteArray &typeName)
 {
@@ -606,7 +595,6 @@ QByteArray removeNamespace(const QByteArray &typeName)
     }
 }
 
-
 int metaTypeOf(const char *typeNameBytes)
 {
     QByteArray typeName(typeNameBytes);
@@ -633,7 +621,6 @@ int metaTypeOf(const char *typeNameBytes)
         }
     }
 }
-
 
 QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, QVariantMap kwargs)
 {
@@ -707,12 +694,12 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
     QGenericReturnArgument rarg(found.typeName(), rvalue.data());
 
     found.invoke(obj, Qt::DirectConnection, rarg, parameters[0], parameters[1], parameters[2], parameters[3],
-            parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9]);
+                 parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9]);
     return rvalue;
 }
 
-
-QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs, const QVariantMap &header)
+QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs,
+                                    const QVariantMap &header)
 {
     Q_Q(Peer);
     const QStringList &l = methodName.split(QChar('.'));
@@ -728,11 +715,12 @@ QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantLis
 
     QPointer<Rpc> rpc = this->rpc;
     rpc.data()->d_func()->setCurrentPeerAndHeader(q, header);
-    Cleaner cleaner([rpc]{
+    Cleaner cleaner([rpc] {
         if (rpc.isNull())
             return;
         rpc.data()->d_func()->deleteCurrentPeerAndHeader();
-    }); Q_UNUSED(cleaner);
+    });
+    Q_UNUSED(cleaner);
 
     if (!this->rpc->dd_ptr->loggingCallback.isNull()) {
         if (rpcService.type == ServiceType::FUNCTION) {
@@ -787,22 +775,17 @@ QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantLis
             }
         }
     }
-
 }
 
-
-Peer::Peer(const QString &name, const QSharedPointer<DataChannel> &channel,
-                 const QPointer<Rpc> &rpc)
-    :d_ptr(new PeerPrivate(name, channel, rpc, this))
+Peer::Peer(const QString &name, const QSharedPointer<DataChannel> &channel, const QPointer<Rpc> &rpc)
+    : d_ptr(new PeerPrivate(name, channel, rpc, this))
 {
 }
-
 
 Peer::~Peer()
 {
     delete d_ptr;
 }
-
 
 void Peer::shutdown()
 {
@@ -810,13 +793,11 @@ void Peer::shutdown()
     d->shutdown();
 }
 
-
 bool Peer::isOk() const
 {
     Q_D(const Peer);
     return !d->broken && !d->rpc.isNull();
 }
-
 
 bool Peer::isActive() const
 {
@@ -824,13 +805,11 @@ bool Peer::isActive() const
     return !d->waiters.isEmpty();
 }
 
-
 QString Peer::name() const
 {
     Q_D(const Peer);
     return d->name;
 }
-
 
 void Peer::setName(const QString &name)
 {
@@ -838,13 +817,11 @@ void Peer::setName(const QString &name)
     d->name = name;
 }
 
-
 QString Peer::address() const
 {
     Q_D(const Peer);
     return d->address;
 }
-
 
 void Peer::setAddress(const QString &address)
 {
@@ -852,13 +829,11 @@ void Peer::setAddress(const QString &address)
     d->address = address;
 }
 
-
 QVariant Peer::call(const QString &method, const QVariantList &args, const QVariantMap &kwargs)
 {
     Q_D(Peer);
     return d->call(method, args, kwargs);
 }
-
 
 QVariant Peer::call(const QString &method, const QVariant &arg1)
 {
@@ -868,7 +843,6 @@ QVariant Peer::call(const QString &method, const QVariant &arg1)
     return d->call(method, args, QVariantMap());
 }
 
-
 QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2)
 {
     Q_D(Peer);
@@ -876,7 +850,6 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
     args << arg1 << arg2;
     return d->call(method, args, QVariantMap());
 }
-
 
 QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3)
 {
@@ -886,8 +859,8 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
     return d->call(method, args, QVariantMap());
 }
 
-
-QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3, const QVariant &arg4)
+QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                    const QVariant &arg4)
 {
     Q_D(Peer);
     QVariantList args;
@@ -895,8 +868,8 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
     return d->call(method, args, QVariantMap());
 }
 
-
-QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3, const QVariant &arg4, const QVariant &arg5)
+QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                    const QVariant &arg4, const QVariant &arg5)
 {
     Q_D(Peer);
     QVariantList args;
@@ -904,8 +877,8 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
     return d->call(method, args, QVariantMap());
 }
 
-
-QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3, const QVariant &arg4, const QVariant &arg5, const QVariant &arg6)
+QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                    const QVariant &arg4, const QVariant &arg5, const QVariant &arg6)
 {
     Q_D(Peer);
     QVariantList args;
@@ -913,8 +886,8 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
     return d->call(method, args, QVariantMap());
 }
 
-
-QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3, const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7)
+QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                    const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7)
 {
     Q_D(Peer);
     QVariantList args;
@@ -922,8 +895,9 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
     return d->call(method, args, QVariantMap());
 }
 
-
-QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3, const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7, const QVariant &arg8)
+QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                    const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7,
+                    const QVariant &arg8)
 {
     Q_D(Peer);
     QVariantList args;
@@ -931,15 +905,15 @@ QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant 
     return d->call(method, args, QVariantMap());
 }
 
-
-QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3, const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7, const QVariant &arg8, const QVariant &arg9)
+QVariant Peer::call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                    const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7,
+                    const QVariant &arg8, const QVariant &arg9)
 {
     Q_D(Peer);
     QVariantList args;
     args << arg1 << arg2 << arg3 << arg4 << arg5 << arg6 << arg7 << arg8 << arg9;
     return d->call(method, args, QVariantMap());
 }
-
 
 QSharedPointer<VirtualChannel> Peer::makeChannel()
 {
@@ -949,7 +923,6 @@ QSharedPointer<VirtualChannel> Peer::makeChannel()
     }
     return d->channel->makeChannel();
 }
-
 
 QSharedPointer<VirtualChannel> Peer::takeChannel(quint32 channelNumber)
 {

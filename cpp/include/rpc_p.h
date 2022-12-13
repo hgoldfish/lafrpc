@@ -10,7 +10,6 @@ struct PeerAndHeader
     QVariantMap header;
 };
 
-
 class Transport;
 class TcpTransport;
 class RpcPrivate
@@ -33,7 +32,8 @@ public:
     bool isConnecting(const QString &peerName) const;
     QVariantMap getRpcHeader();
     QPointer<Peer> getCurrentPeer();
-    QSharedPointer<Peer> preparePeer(const QSharedPointer<qtng::DataChannel> &channel, const QString &peerName, const QString &peerAddress);
+    QSharedPointer<Peer> preparePeer(const QSharedPointer<qtng::DataChannel> &channel, const QString &peerName,
+                                     const QString &peerAddress);
     inline QSharedPointer<Transport> findTransport(const QString &address);
     void setCurrentPeerAndHeader(const QPointer<Peer> &peer, const QVariantMap &header);
     void deleteCurrentPeerAndHeader();
@@ -66,4 +66,4 @@ private:
 
 END_LAFRPC_NAMESPACE
 
-#endif // LAFRPC_RPC_P_H
+#endif  // LAFRPC_RPC_P_H

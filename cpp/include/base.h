@@ -1,12 +1,12 @@
 #ifndef LAFRPC_BASE_H
 #define LAFRPC_BASE_H
 
-#include <QtCore/qstring.h>
-#include <QtCore/qvariant.h>
-#include <QtCore/qsharedpointer.h>
-#include <functional>
 #include "qtnetworkng.h"
 #include "utils.h"
+#include <QtCore/qsharedpointer.h>
+#include <QtCore/qstring.h>
+#include <QtCore/qvariant.h>
+#include <functional>
 
 BEGIN_LAFRPC_NAMESPACE
 
@@ -14,10 +14,13 @@ BEGIN_LAFRPC_NAMESPACE
 class RpcException
 {
 public:
-    RpcException() {}
+    RpcException() { }
     RpcException(const RpcException &other);
     RpcException(RpcException &&other);
-    RpcException(const QString &message): message(message) {}
+    RpcException(const QString &message)
+        : message(message)
+    {
+    }
     virtual ~RpcException();
 public:
     virtual QString what() const;
@@ -25,35 +28,53 @@ public:
     QString message;
 };
 
-
-class RpcInternalException: public RpcException
+class RpcInternalException : public RpcException
 {
 public:
-    RpcInternalException(): RpcException() {}
-    RpcInternalException(const QString &message): RpcException(message) {}
+    RpcInternalException()
+        : RpcException()
+    {
+    }
+    RpcInternalException(const QString &message)
+        : RpcException(message)
+    {
+    }
 public:
     virtual QString what() const;
     virtual void raise();
 };
 
-
-class RpcDisconnectedException: public RpcException
+class RpcDisconnectedException : public RpcException
 {
 public:
-    RpcDisconnectedException(): RpcException() {}
-    RpcDisconnectedException(const QString &message): RpcException(message) {}
+    RpcDisconnectedException()
+        : RpcException()
+    {
+    }
+    RpcDisconnectedException(const QString &message)
+        : RpcException(message)
+    {
+    }
 public:
     virtual QString what() const;
     virtual void raise();
 };
 
-
-class RpcRemoteException: public RpcException
+class RpcRemoteException : public RpcException
 {
 public:
-    RpcRemoteException(): RpcException() {}
-    RpcRemoteException(const RpcRemoteException &other) : RpcRemoteException(other.message) {}
-    RpcRemoteException(const QString &message): RpcException(message) {}
+    RpcRemoteException()
+        : RpcException()
+    {
+    }
+    RpcRemoteException(const RpcRemoteException &other)
+        : RpcRemoteException(other.message)
+    {
+    }
+    RpcRemoteException(const QString &message)
+        : RpcException(message)
+    {
+    }
 public:
     virtual QString what() const override;
     virtual void raise() override;
@@ -64,31 +85,33 @@ public:
     static QString lafrpcKey() { return "RpcRemoteException"; }
 };
 
-
-class RpcSerializationException: public RpcException
+class RpcSerializationException : public RpcException
 {
 public:
-    RpcSerializationException(): RpcException() {}
-    RpcSerializationException(const QString &message): RpcException(message) {}
+    RpcSerializationException()
+        : RpcException()
+    {
+    }
+    RpcSerializationException(const QString &message)
+        : RpcException(message)
+    {
+    }
 public:
     virtual QString what() const;
     virtual void raise();
 };
 
-
-class Callable: public QObject
+class Callable : public QObject
 {
 public:
     virtual QVariant call(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs) = 0;
 };
 
-
 class Serialization;
 class Rpc;
 struct UseStream
 {
-    enum Place
-    {
+    enum Place {
         ServerSide = 1,
         ClientSide = 2,
         ParamInRequest = 4,
@@ -102,14 +125,14 @@ struct UseStream
     qtng::Event ready;
 
     UseStream()
-        :place(ServerSide | ValueOfResponse), preferRawSocket(false)
-    {}
+        : place(ServerSide | ValueOfResponse)
+        , preferRawSocket(false)
+    {
+    }
 
-    virtual ~UseStream() {}
-
+    virtual ~UseStream() { }
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(UseStream::Places)
-
 
 struct Request
 {
@@ -123,11 +146,11 @@ struct Request
 
     Request()
         : channel(0)
-    {}
+    {
+    }
 
     bool isOk() const { return !id.isEmpty() && !methodName.isEmpty(); }
 };
-
 
 struct Response
 {
@@ -139,7 +162,8 @@ struct Response
 
     Response()
         : channel(0)
-    {}
+    {
+    }
 
     bool isOk() const { return !id.isEmpty(); }
 };
@@ -148,4 +172,4 @@ END_LAFRPC_NAMESPACE
 
 Q_DECLARE_METATYPE(QSharedPointer<LAFRPC_NAMESPACE::RpcRemoteException>)
 
-#endif // LAFRPC_BASE_H
+#endif  // LAFRPC_BASE_H

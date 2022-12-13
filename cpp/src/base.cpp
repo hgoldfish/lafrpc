@@ -3,26 +3,22 @@
 
 BEGIN_LAFRPC_NAMESPACE
 
-
 RpcException::RpcException(const RpcException &other)
-    :message(other.message)
-{}
+    : message(other.message)
+{
+}
 
-
-RpcException::~RpcException() {}
-
+RpcException::~RpcException() { }
 
 RpcException::RpcException(RpcException &&other)
 {
     qSwap(message, other.message);
 }
 
-
 void RpcException::raise()
 {
     throw *this;
 }
-
 
 QString RpcException::what() const
 {
@@ -33,12 +29,10 @@ QString RpcException::what() const
     }
 }
 
-
 void RpcInternalException::raise()
 {
     throw *this;
 }
-
 
 QString RpcInternalException::what() const
 {
@@ -49,12 +43,10 @@ QString RpcInternalException::what() const
     }
 }
 
-
 void RpcDisconnectedException::raise()
 {
     throw *this;
 }
-
 
 QString RpcDisconnectedException::what() const
 {
@@ -65,12 +57,10 @@ QString RpcDisconnectedException::what() const
     }
 }
 
-
 void RpcRemoteException::raise()
 {
     throw *this;
 }
-
 
 QString RpcRemoteException::what() const
 {
@@ -81,7 +71,6 @@ QString RpcRemoteException::what() const
     }
 }
 
-
 QVariantMap RpcRemoteException::saveState() const
 {
     QVariantMap state;
@@ -89,13 +78,11 @@ QVariantMap RpcRemoteException::saveState() const
     return state;
 }
 
-
 bool RpcRemoteException::restoreState(const QVariantMap &state)
 {
     message = state.value("message").toString();
     return true;
 }
-
 
 QVariant RpcRemoteException::clone()
 {
@@ -103,12 +90,10 @@ QVariant RpcRemoteException::clone()
     return QVariant::fromValue(e);
 }
 
-
 void RpcSerializationException::raise()
 {
     throw *this;
 }
-
 
 QString RpcSerializationException::what() const
 {
@@ -118,6 +103,5 @@ QString RpcSerializationException::what() const
         return message;
     }
 }
-
 
 END_LAFRPC_NAMESPACE

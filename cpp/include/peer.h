@@ -1,24 +1,23 @@
 #ifndef LAFRPC_PEER_H
 #define LAFRPC_PEER_H
 
-#include <QtCore/qobject.h>
+#include "utils.h"
 #include <QtCore/qlist.h>
 #include <QtCore/qmap.h>
-#include <QtCore/qvariant.h>
+#include <QtCore/qobject.h>
 #include <QtCore/qsharedpointer.h>
-#include "utils.h"
-
+#include <QtCore/qvariant.h>
 
 namespace qtng {
 class DataChannel;
 class VirtualChannel;
-}
+}  // namespace qtng
 
 BEGIN_LAFRPC_NAMESPACE
 
 class PeerPrivate;
 class Rpc;
-class Peer: public RegisterServiceMixin<QObject>
+class Peer : public RegisterServiceMixin<QObject>
 {
     Q_OBJECT
 public:
@@ -27,7 +26,7 @@ public:
 public:
     void shutdown();
     void close() { shutdown(); }
-    bool isOk() const;   // peer is connected.
+    bool isOk() const;  // peer is connected.
     bool isActive() const;  // is making calls
     inline quint64 id() const { return (quint64) static_cast<const void *>(this); }
     QString name() const;
@@ -39,25 +38,21 @@ public:
                   const QVariantMap &kwargs = QVariantMap());
     QVariant call(const QString &method, const QVariant &arg1);
     QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2);
-    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2,
-                  const QVariant &arg3);
-    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2,
-                  const QVariant &arg3, const QVariant &arg4);
-    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2,
-                  const QVariant &arg3, const QVariant &arg4, const QVariant &arg5);
-    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2,
-                  const QVariant &arg3, const QVariant &arg4, const QVariant &arg5,
-                  const QVariant &arg6);
-    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2,
-                  const QVariant &arg3, const QVariant &arg4, const QVariant &arg5,
-                  const QVariant &arg6, const QVariant &arg7);
-    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2,
-                  const QVariant &arg3, const QVariant &arg4, const QVariant &arg5,
-                  const QVariant &arg6, const QVariant &arg7, const QVariant &arg8);
-    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2,
-                  const QVariant &arg3, const QVariant &arg4, const QVariant &arg5,
-                  const QVariant &arg6, const QVariant &arg7, const QVariant &arg8,
-                  const QVariant &arg9);
+    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3);
+    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                  const QVariant &arg4);
+    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                  const QVariant &arg4, const QVariant &arg5);
+    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                  const QVariant &arg4, const QVariant &arg5, const QVariant &arg6);
+    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                  const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7);
+    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                  const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7,
+                  const QVariant &arg8);
+    QVariant call(const QString &method, const QVariant &arg1, const QVariant &arg2, const QVariant &arg3,
+                  const QVariant &arg4, const QVariant &arg5, const QVariant &arg6, const QVariant &arg7,
+                  const QVariant &arg8, const QVariant &arg9);
 
     QSharedPointer<qtng::VirtualChannel> makeChannel();
     QSharedPointer<qtng::VirtualChannel> takeChannel(quint32 channelNumber);
@@ -68,7 +63,6 @@ private:
     PeerPrivate * const d_ptr;
 };
 
-
 END_LAFRPC_NAMESPACE
 
-#endif //LAFRPC_PEER_H
+#endif  // LAFRPC_PEER_H

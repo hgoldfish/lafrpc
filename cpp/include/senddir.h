@@ -1,9 +1,9 @@
 #ifndef LAFRPC_SENDDIR_H
 #define LAFRPC_SENDDIR_H
 
-#include <QtCore/qsharedpointer.h>
-#include <QtCore/qfile.h>
 #include "base.h"
+#include <QtCore/qfile.h>
+#include <QtCore/qsharedpointer.h>
 
 BEGIN_LAFRPC_NAMESPACE
 
@@ -19,16 +19,18 @@ struct RpcDirFileEntry
     bool isdir;
 };
 
-
 struct CallbackInfo
 {
-    CallbackInfo(const QString &filePath, qint32 bs, quint64 fileRead, quint64 fileSize, quint64 totalRead, quint64 totalSize)
+    CallbackInfo(const QString &filePath, qint32 bs, quint64 fileRead, quint64 fileSize, quint64 totalRead,
+                 quint64 totalSize)
         : filePath(filePath)
         , currentRead(bs)
         , currentFileRead(fileRead)
         , currentFileSize(fileSize)
         , totalRead(totalRead)
-        , totalSize(totalSize) {}
+        , totalSize(totalSize)
+    {
+    }
     QString filePath;
     qint32 currentRead;
     quint64 currentFileRead;
@@ -37,10 +39,9 @@ struct CallbackInfo
     quint64 totalSize;
 };
 
-
 class RpcDirPrivate;
 class RpcDirFileProvider;
-class RpcDir: public UseStream
+class RpcDir : public UseStream
 {
 public:
     typedef std::function<bool(CallbackInfo)> ProgressCallback;
@@ -51,12 +52,12 @@ public:
     bool populate();
     bool isValid() const;
 
-    bool writeToPath(const QString &path, ProgressCallback progressCallback=nullptr);
-    bool readFromPath(const QString &path, ProgressCallback progressCallback=nullptr);
-    bool readFromPath(ProgressCallback progressCallback=nullptr);
+    bool writeToPath(const QString &path, ProgressCallback progressCallback = nullptr);
+    bool readFromPath(const QString &path, ProgressCallback progressCallback = nullptr);
+    bool readFromPath(ProgressCallback progressCallback = nullptr);
 
-    bool writeTo(QSharedPointer<RpcDirFileProvider> provider, ProgressCallback progressCallback=nullptr);
-    bool readFrom(QSharedPointer<RpcDirFileProvider> provider, ProgressCallback progressCallback=nullptr);
+    bool writeTo(QSharedPointer<RpcDirFileProvider> provider, ProgressCallback progressCallback = nullptr);
+    bool readFrom(QSharedPointer<RpcDirFileProvider> provider, ProgressCallback progressCallback = nullptr);
 public:
     QString name() const;
     void setName(const QString &name);
@@ -79,7 +80,6 @@ public:
     Q_DECLARE_PRIVATE(RpcDir)
 };
 
-
 class RpcDirFileProvider
 {
 public:
@@ -87,24 +87,26 @@ public:
 public:
     virtual QSharedPointer<qtng::FileLike> getFile(const QString &filePath, QIODevice::OpenMode mode) = 0;
     virtual bool createDirectory(const QString &dirPath);
-    virtual bool updateTimes(const QString &filePath, const QDateTime &created,
-                             const QDateTime &lastModified, const QDateTime &lastAccess);
+    virtual bool updateTimes(const QString &filePath, const QDateTime &created, const QDateTime &lastModified,
+                             const QDateTime &lastAccess);
 };
 
-
-class NativeRpcDirFileProvider: public RpcDirFileProvider
+class NativeRpcDirFileProvider : public RpcDirFileProvider
 {
 public:
     NativeRpcDirFileProvider(const QString &root)
-        : rootDir(root) { rootDir.makeAbsolute(); }
+        : rootDir(root)
+    {
+        rootDir.makeAbsolute();
+    }
     virtual QSharedPointer<qtng::FileLike> getFile(const QString &filePath, QIODevice::OpenMode mode) override;
     virtual bool createDirectory(const QString &dirPath) override;
-    virtual bool updateTimes(const QString &filePath, const QDateTime &created, const QDateTime &lastModified, const QDateTime &lastAccess) override;
+    virtual bool updateTimes(const QString &filePath, const QDateTime &created, const QDateTime &lastModified,
+                             const QDateTime &lastAccess) override;
     QString makePath(const QString &filePath);
 public:
     QDir rootDir;
 };
-
 
 END_LAFRPC_NAMESPACE
 

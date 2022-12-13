@@ -7,16 +7,17 @@
 
 BEGIN_LAFRPC_NAMESPACE
 
-
 struct RawSocket
 {
-    RawSocket() {}
+    RawSocket() { }
     RawSocket(QSharedPointer<qtng::SocketLike> connection, const QDateTime &timeStamp)
-        :connection(connection), timeStamp(timeStamp) {}
+        : connection(connection)
+        , timeStamp(timeStamp)
+    {
+    }
     QSharedPointer<qtng::SocketLike> connection;
     QDateTime timeStamp;
 };
-
 
 class Rpc;
 class Peer;
@@ -36,7 +37,8 @@ public:
 protected:
     virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
                                                               QSharedPointer<qtng::SocketDnsCache> dnsCache) = 0;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) = 0;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) = 0;
     virtual QString getAddressTemplate() = 0;
     virtual bool parseAddress(const QString &address, QString &host, quint16 &port);
 private:
@@ -46,84 +48,101 @@ public:
     QPointer<Rpc> rpc;
 };
 
-
-class TcpTransport: public Transport
+class TcpTransport : public Transport
 {
 public:
     explicit TcpTransport(QPointer<Rpc> rpc)
-        : Transport(rpc) {}
+        : Transport(rpc)
+    {
+    }
 public:
     virtual QString name() const override;
     virtual bool canHandle(const QString &address) override;
 protected:
-    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
+                                                              QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) override;
     virtual QString getAddressTemplate() override;
 private:
     friend class TcpTransportRequestHandler;
 };
 
-
-class SslTransport: public TcpTransport
+class SslTransport : public TcpTransport
 {
 public:
     explicit SslTransport(QPointer<Rpc> rpc)
-        : TcpTransport(rpc) {}
+        : TcpTransport(rpc)
+    {
+    }
 public:
     virtual QString name() const override;
     virtual bool canHandle(const QString &address) override;
 protected:
-    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
+                                                              QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) override;
     virtual QString getAddressTemplate() override;
 public:
     qtng::SslConfiguration sslConfig;
 };
 
-
-class KcpTransport: public TcpTransport
+class KcpTransport : public TcpTransport
 {
 public:
     explicit KcpTransport(QPointer<Rpc> rpc)
-        : TcpTransport(rpc) {}
+        : TcpTransport(rpc)
+    {
+    }
 public:
     virtual QString name() const override;
     virtual bool canHandle(const QString &address) override;
 protected:
-    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
+                                                              QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) override;
     virtual QString getAddressTemplate() override;
 };
 
-
-class KcpSslTransport: public TcpTransport
+class KcpSslTransport : public TcpTransport
 {
 public:
     explicit KcpSslTransport(QPointer<Rpc> rpc)
-        : TcpTransport(rpc) {}
+        : TcpTransport(rpc)
+    {
+    }
 public:
     virtual QString name() const override;
     virtual bool canHandle(const QString &address) override;
 protected:
-    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
+                                                              QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) override;
     virtual QString getAddressTemplate() override;
 public:
     qtng::SslConfiguration sslConfig;
 };
 
-
-class HttpTransport: public Transport
+class HttpTransport : public Transport
 {
 public:
     explicit HttpTransport(QPointer<Rpc> rpc)
-        : Transport(rpc), session(new qtng::HttpSession()), rootDir(QDir::current()) {}
+        : Transport(rpc)
+        , session(new qtng::HttpSession())
+        , rootDir(QDir::current())
+    {
+    }
 public:
     virtual QString name() const override;
     virtual bool canHandle(const QString &address) override;
 protected:
-    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
+                                                              QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) override;
     virtual QString getAddressTemplate() override;
     virtual bool parseAddress(const QString &address, QString &host, quint16 &port) override;
 public:
@@ -131,35 +150,40 @@ public:
     QDir rootDir;
 };
 
-
-class HttpsTransport: public HttpTransport
+class HttpsTransport : public HttpTransport
 {
 public:
     explicit HttpsTransport(QPointer<Rpc> rpc)
-        : HttpTransport(rpc) {}
+        : HttpTransport(rpc)
+    {
+    }
 public:
     virtual QString name() const override;
     virtual bool canHandle(const QString &address) override;
 protected:
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) override;
     virtual QString getAddressTemplate() override;
     virtual bool parseAddress(const QString &address, QString &host, quint16 &port) override;
 public:
     qtng::SslConfiguration sslConfig;
 };
 
-
-class HttpSslTransport: public HttpTransport
+class HttpSslTransport : public HttpTransport
 {
 public:
     explicit HttpSslTransport(QPointer<Rpc> rpc)
-        : HttpTransport(rpc) {}
+        : HttpTransport(rpc)
+    {
+    }
 public:
     virtual QString name() const override;
     virtual bool canHandle(const QString &address) override;
 protected:
-    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host, quint16 port) override;
+    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
+                                                              QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
+    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
+                                                                quint16 port) override;
     virtual QString getAddressTemplate() override;
 public:
     qtng::SslConfiguration sslConfig;
@@ -167,4 +191,4 @@ public:
 
 END_LAFRPC_NAMESPACE
 
-#endif //LAFRPC_TRANSPORT_H
+#endif  // LAFRPC_TRANSPORT_H

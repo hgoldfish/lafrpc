@@ -1,14 +1,14 @@
 #ifndef LAFRPC_SENDFILE_H
 #define LAFRPC_SENDFILE_H
 
-#include <QtCore/qsharedpointer.h>
-#include <QtCore/qfile.h>
 #include "base.h"
+#include <QtCore/qfile.h>
+#include <QtCore/qsharedpointer.h>
 
 BEGIN_LAFRPC_NAMESPACE
 
 class RpcFilePrivate;
-class RpcFile: public UseStream
+class RpcFile : public UseStream
 {
 public:
     typedef std::function<bool(qint64 bs, quint64 count, quint64 total)> ProgressCallback;

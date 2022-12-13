@@ -6,19 +6,18 @@
 #include "../include/rpc_p.h"
 #include "../include/peer.h"
 
-static Q_LOGGING_CATEGORY(logger, "lafrpc.transport")
+static Q_LOGGING_CATEGORY(logger, "lafrpc.transport");
 
 using namespace qtng;
 
 BEGIN_LAFRPC_NAMESPACE
 
-
 Transport::Transport(QPointer<Rpc> rpc)
-    : rpc(rpc) {}
+    : rpc(rpc)
+{
+}
 
-
-Transport::~Transport() {}
-
+Transport::~Transport() { }
 
 bool Transport::parseAddress(const QString &address, QString &host, quint16 &port)
 {
@@ -36,7 +35,6 @@ bool Transport::parseAddress(const QString &address, QString &host, quint16 &por
     port = static_cast<quint16>(u.port());
     return port > 0;
 }
-
 
 bool Transport::startServer(const QString &address)
 {
@@ -66,7 +64,6 @@ bool Transport::startServer(const QString &address)
     return server->serveForever();
 }
 
-
 QSharedPointer<DataChannel> Transport::connect(const QString &address)
 {
     QString host;
@@ -77,7 +74,8 @@ QSharedPointer<DataChannel> Transport::connect(const QString &address)
         return QSharedPointer<DataChannel>();
     }
 
-    QSharedPointer<SocketLike> request = createConnection(address, host, port, RpcPrivate::getPrivateHelper(rpc.data())->dnsCache);
+    QSharedPointer<SocketLike> request =
+            createConnection(address, host, port, RpcPrivate::getPrivateHelper(rpc.data())->dnsCache);
     if (request.isNull()) {
         return QSharedPointer<DataChannel>();
     }
@@ -93,7 +91,6 @@ QSharedPointer<DataChannel> Transport::connect(const QString &address)
     return channel;
 }
 
-
 QSharedPointer<SocketLike> Transport::makeRawSocket(const QString &address, QByteArray &connectionId)
 {
     QString host;
@@ -104,7 +101,8 @@ QSharedPointer<SocketLike> Transport::makeRawSocket(const QString &address, QByt
         return QSharedPointer<SocketLike>();
     }
 
-    QSharedPointer<SocketLike> request = createConnection(address, host, port, RpcPrivate::getPrivateHelper(rpc.data())->dnsCache);
+    QSharedPointer<SocketLike> request =
+            createConnection(address, host, port, RpcPrivate::getPrivateHelper(rpc.data())->dnsCache);
     if (request.isNull()) {
         return request;
     }
@@ -127,13 +125,11 @@ QSharedPointer<SocketLike> Transport::makeRawSocket(const QString &address, QByt
     return request;
 }
 
-
 QSharedPointer<SocketLike> Transport::takeRawSocket(const QByteArray &connectionId)
 {
     const RawSocket &rawConnection = rawConnections[connectionId];
     return rawConnection.connection;
 }
-
 
 void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<SocketChannel> channel)
 {
@@ -164,7 +160,6 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
     }
 }
 
-
 bool Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rpcHeader)
 {
     if (rpc.isNull()) {
@@ -185,7 +180,7 @@ bool Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rp
             address = address.arg(peerAddress.toString());
         }
         address = address.arg(request->peerPort());
-        qCDebug(logger) << "got request from:" << address;
+        // qCDebug(logger) << "got request from:" << address;
         rpc->preparePeer(channel, QString(), address);
     } else if (rpcHeader == QByteArray("\x33\x74")) {
         const QByteArray &connectionId = request->recvall(16);
@@ -201,8 +196,7 @@ bool Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rp
     return true;
 }
 
-
-class TcpTransportRequestHandler: public BaseRequestHandler
+class TcpTransportRequestHandler : public BaseRequestHandler
 {
 protected:
     virtual void handle() override
@@ -210,11 +204,11 @@ protected:
         QByteArray rpcHeader;
         userData<TcpTransport>()->handleRequest(request, rpcHeader);
     }
-    virtual void finish() override {}
+    virtual void finish() override { }
 };
 
-
-QSharedPointer<SocketLike> TcpTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> TcpTransport::createConnection(const QString &, const QString &host, quint16 port,
+                                                          QSharedPointer<SocketDnsCache> dnsCache)
 {
     QSharedPointer<Socket> s(Socket::createConnection(host, port, nullptr, dnsCache));
     if (!s.isNull()) {
@@ -224,7 +218,6 @@ QSharedPointer<SocketLike> TcpTransport::createConnection(const QString &, const
     }
 }
 
-
 QSharedPointer<BaseStreamServer> TcpTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
     QSharedPointer<BaseStreamServer> server(new TcpServer<TcpTransportRequestHandler>(host, port));
@@ -232,26 +225,23 @@ QSharedPointer<BaseStreamServer> TcpTransport::createServer(const QString &, con
     return server;
 }
 
-
 QString TcpTransport::getAddressTemplate()
 {
     return QStringLiteral("tcp://%1:%2");
 }
-
 
 QString TcpTransport::name() const
 {
     return QString::fromUtf8("TcpTransport");
 }
 
-
 bool TcpTransport::canHandle(const QString &address)
 {
     return address.startsWith("tcp://", Qt::CaseInsensitive);
 }
 
-
-QSharedPointer<SocketLike> SslTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> SslTransport::createConnection(const QString &, const QString &host, quint16 port,
+                                                          QSharedPointer<SocketDnsCache> dnsCache)
 {
     QSharedPointer<SslSocket> ssl(SslSocket::createConnection(host, port, sslConfig, nullptr, dnsCache));
     if (!ssl.isNull()) {
@@ -261,7 +251,6 @@ QSharedPointer<SocketLike> SslTransport::createConnection(const QString &, const
     }
 }
 
-
 QSharedPointer<BaseStreamServer> SslTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
     QSharedPointer<BaseStreamServer> server(new SslServer<TcpTransportRequestHandler>(host, port, sslConfig));
@@ -269,26 +258,22 @@ QSharedPointer<BaseStreamServer> SslTransport::createServer(const QString &, con
     return server;
 }
 
-
 QString SslTransport::name() const
 {
     return QString::fromUtf8("SslTransport");
 }
-
 
 bool SslTransport::canHandle(const QString &address)
 {
     return address.startsWith("ssl://", Qt::CaseInsensitive) || address.startsWith("ssl+tcp://", Qt::CaseInsensitive);
 }
 
-
 QString SslTransport::getAddressTemplate()
 {
     return QStringLiteral("ssl://%1:%2");
 }
 
-
-class KcpSocketWithFilter: public KcpSocket
+class KcpSocketWithFilter : public KcpSocket
 {
 public:
     KcpSocketWithFilter(HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc);
@@ -296,11 +281,11 @@ public:
     QPointer<Rpc> rpc;
 };
 
-
 KcpSocketWithFilter::KcpSocketWithFilter(HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc)
     : KcpSocket(protocol)
-    , rpc(rpc) {}
-
+    , rpc(rpc)
+{
+}
 
 bool KcpSocketWithFilter::filter(char *data, qint32 *len, HostAddress *addr, quint16 *port)
 {
@@ -310,36 +295,37 @@ bool KcpSocketWithFilter::filter(char *data, qint32 *len, HostAddress *addr, qui
     return rpc->kcpFilter()->filter(this, data, len, addr, port);
 }
 
-
-class KcpServerWithFilter: public KcpServer<TcpTransportRequestHandler>
+class KcpServerWithFilter : public KcpServer<TcpTransportRequestHandler>
 {
 public:
     KcpServerWithFilter(const HostAddress &serverAddress, quint16 serverPort)
-        : KcpServer<TcpTransportRequestHandler>(serverAddress, serverPort) {}
+        : KcpServer<TcpTransportRequestHandler>(serverAddress, serverPort)
+    {
+    }
 protected:
     virtual QSharedPointer<SocketLike> serverCreate() override;
 };
 
-
 QSharedPointer<SocketLike> KcpServerWithFilter::serverCreate()
 {
-    QPointer<Rpc> rpc = static_cast<KcpTransport*>(userData())->rpc;
-    return asSocketLike(createServer<KcpSocketWithFilter>(serverAddress(), serverPort(), 0,
-            [rpc] (HostAddress::NetworkLayerProtocol family) { return new KcpSocketWithFilter(family, rpc); }));
+    QPointer<Rpc> rpc = static_cast<KcpTransport *>(userData())->rpc;
+    return asSocketLike(createServer<KcpSocketWithFilter>(
+            serverAddress(), serverPort(), 0,
+            [rpc](HostAddress::NetworkLayerProtocol family) { return new KcpSocketWithFilter(family, rpc); }));
 }
 
-
-QSharedPointer<SocketLike> KcpTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> KcpTransport::createConnection(const QString &, const QString &host, quint16 port,
+                                                          QSharedPointer<SocketDnsCache> dnsCache)
 {
-    QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
-                [this] (HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
+    QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(
+            host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
+            [this](HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
     if (kcp) {
         return asSocketLike(kcp);
     } else {
         return QSharedPointer<SocketLike>();
     }
 }
-
 
 QSharedPointer<BaseStreamServer> KcpTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
@@ -348,32 +334,29 @@ QSharedPointer<BaseStreamServer> KcpTransport::createServer(const QString &, con
     return server;
 }
 
-
 QString KcpTransport::name() const
 {
     return QString::fromUtf8("KcpTransport");
 }
-
 
 bool KcpTransport::canHandle(const QString &address)
 {
     return address.startsWith("kcp://", Qt::CaseInsensitive);
 }
 
-
 QString KcpTransport::getAddressTemplate()
 {
     return QStringLiteral("kcp://%1:%2");
 }
 
-
 typedef WithSsl<KcpServerWithFilter> SslKcpServerWithFilter;
 
-
-QSharedPointer<SocketLike> KcpSslTransport::createConnection(const QString &, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> KcpSslTransport::createConnection(const QString &, const QString &host, quint16 port,
+                                                             QSharedPointer<SocketDnsCache> dnsCache)
 {
-    QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
-                                               [this] (HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
+    QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(
+            host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
+            [this](HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
     if (kcp) {
         QSharedPointer<SslSocket> ssl(new SslSocket(asSocketLike(kcp), sslConfig));
         if (!ssl->handshake(false)) {
@@ -385,7 +368,6 @@ QSharedPointer<SocketLike> KcpSslTransport::createConnection(const QString &, co
     }
 }
 
-
 QSharedPointer<BaseStreamServer> KcpSslTransport::createServer(const QString &, const HostAddress &host, quint16 port)
 {
     QSharedPointer<BaseStreamServer> server(new SslKcpServerWithFilter(host, port, sslConfig));
@@ -393,30 +375,30 @@ QSharedPointer<BaseStreamServer> KcpSslTransport::createServer(const QString &, 
     return server;
 }
 
-
 QString KcpSslTransport::name() const
 {
     return QString::fromUtf8("KcpSslTransport");
 }
 
-
 bool KcpSslTransport::canHandle(const QString &address)
 {
-    return address.startsWith("kcp+ssl://", Qt::CaseInsensitive) || address.startsWith("ssl+kcp://", Qt::CaseInsensitive);
+    return address.startsWith("kcp+ssl://", Qt::CaseInsensitive)
+            || address.startsWith("ssl+kcp://", Qt::CaseInsensitive);
 }
-
 
 QString KcpSslTransport::getAddressTemplate()
 {
     return QStringLiteral("kcp+ssl://%1:%2");
 }
 
-
-class LafrpcHttpRequestHandler: public SimpleHttpRequestHandler
+class LafrpcHttpRequestHandler : public SimpleHttpRequestHandler
 {
 public:
     LafrpcHttpRequestHandler()
-        : SimpleHttpRequestHandler(), closeRequest(true) {}
+        : SimpleHttpRequestHandler()
+        , closeRequest(true)
+    {
+    }
 protected:
     virtual bool setup() override;
     virtual void doPOST() override;
@@ -426,7 +408,6 @@ private:
     bool closeRequest;
 };
 
-
 struct LafrpcHttpData
 {
     QString rpcPath;
@@ -434,13 +415,11 @@ struct LafrpcHttpData
     SslConfiguration sslConfig;
 };
 
-
 bool LafrpcHttpRequestHandler::setup()
 {
     rootDir = userData<LafrpcHttpData>()->transport->rootDir;
     return true;
 }
-
 
 void LafrpcHttpRequestHandler::doPOST()
 {
@@ -487,14 +466,12 @@ void LafrpcHttpRequestHandler::doPOST()
     }
 }
 
-
 void LafrpcHttpRequestHandler::finish()
 {
     if (closeRequest) {
         request->close();
     }
 }
-
 
 QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool &done)
 {
@@ -506,8 +483,8 @@ QByteArray LafrpcHttpRequestHandler::tryToHandleMagicCode(bool &done)
     return done ? QByteArray() : rpcHeader;
 }
 
-
-QSharedPointer<SocketLike> HttpTransport::createConnection(const QString &address, const QString &, quint16, QSharedPointer<SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> HttpTransport::createConnection(const QString &address, const QString &, quint16,
+                                                           QSharedPointer<SocketDnsCache> dnsCache)
 {
     HttpRequest request("POST", address);
     request.setStreamResponse(true);
@@ -535,8 +512,7 @@ QSharedPointer<SocketLike> HttpTransport::createConnection(const QString &addres
     return stream;
 }
 
-
-class LafrpcHttpServer: public TcpServer<LafrpcHttpRequestHandler>
+class LafrpcHttpServer : public TcpServer<LafrpcHttpRequestHandler>
 {
 public:
     explicit LafrpcHttpServer(const HostAddress &serverAddress, quint16 serverPort)
@@ -548,8 +524,8 @@ public:
     LafrpcHttpData data;
 };
 
-
-QSharedPointer<BaseStreamServer> HttpTransport::createServer(const QString &address, const HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> HttpTransport::createServer(const QString &address, const HostAddress &host,
+                                                             quint16 port)
 {
     QUrl u(address);
     QString rpcPath = u.path();
@@ -562,7 +538,6 @@ QSharedPointer<BaseStreamServer> HttpTransport::createServer(const QString &addr
     server->data.transport = this;
     return server;
 }
-
 
 bool HttpTransport::parseAddress(const QString &address, QString &host, quint16 &port)
 {
@@ -581,29 +556,26 @@ bool HttpTransport::parseAddress(const QString &address, QString &host, quint16 
     return port > 0;
 }
 
-
 QString HttpTransport::getAddressTemplate()
 {
     return QString::fromLatin1("http://%1:%2");
 }
-
 
 QString HttpTransport::name() const
 {
     return QString::fromUtf8("HttpTransport");
 }
 
-
 bool HttpTransport::canHandle(const QString &address)
 {
     return address.startsWith("http://", Qt::CaseInsensitive);
 }
 
-
-class LafrpcHttpsServer: public SslServer<LafrpcHttpRequestHandler>
+class LafrpcHttpsServer : public SslServer<LafrpcHttpRequestHandler>
 {
 public:
-    explicit LafrpcHttpsServer(const HostAddress &serverAddress, quint16 serverPort, const SslConfiguration &configuration)
+    explicit LafrpcHttpsServer(const HostAddress &serverAddress, quint16 serverPort,
+                               const SslConfiguration &configuration)
         : SslServer(serverAddress, serverPort, configuration)
     {
         setUserData(&data);
@@ -612,8 +584,8 @@ public:
     LafrpcHttpData data;
 };
 
-
-QSharedPointer<BaseStreamServer> HttpsTransport::createServer(const QString &address, const HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> HttpsTransport::createServer(const QString &address, const HostAddress &host,
+                                                              quint16 port)
 {
     QUrl u(address);
     QString rpcPath = u.path();
@@ -626,7 +598,6 @@ QSharedPointer<BaseStreamServer> HttpsTransport::createServer(const QString &add
     server->data.transport = this;
     return server;
 }
-
 
 bool HttpsTransport::parseAddress(const QString &address, QString &host, quint16 &port)
 {
@@ -645,26 +616,23 @@ bool HttpsTransport::parseAddress(const QString &address, QString &host, quint16
     return port > 0;
 }
 
-
 QString HttpsTransport::getAddressTemplate()
 {
     return QString::fromLatin1("https://%1:%2");
 }
-
 
 QString HttpsTransport::name() const
 {
     return QString::fromUtf8("HttpsTransport");
 }
 
-
 bool HttpsTransport::canHandle(const QString &address)
 {
     return address.startsWith("https://", Qt::CaseInsensitive);
 }
 
-
-QSharedPointer<SocketLike> HttpSslTransport::createConnection(const QString &address, const QString &host, quint16 port, QSharedPointer<SocketDnsCache> dnsCache)
+QSharedPointer<SocketLike> HttpSslTransport::createConnection(const QString &address, const QString &host, quint16 port,
+                                                              QSharedPointer<SocketDnsCache> dnsCache)
 {
     QString tmpAddress = address;
     tmpAddress.replace(QString::fromUtf8("http+ssl://"), QString::fromUtf8("http://"));
@@ -679,8 +647,8 @@ QSharedPointer<SocketLike> HttpSslTransport::createConnection(const QString &add
     return asSocketLike(ssl);
 }
 
-
-QSharedPointer<BaseStreamServer> HttpSslTransport::createServer(const QString &address, const HostAddress &host, quint16 port)
+QSharedPointer<BaseStreamServer> HttpSslTransport::createServer(const QString &address, const HostAddress &host,
+                                                                quint16 port)
 {
     QUrl u(address);
     QString rpcPath = u.path();
@@ -695,23 +663,19 @@ QSharedPointer<BaseStreamServer> HttpSslTransport::createServer(const QString &a
     return server;
 }
 
-
 QString HttpSslTransport::getAddressTemplate()
 {
     return QString::fromLatin1("http+ssl://%1:%2");
 }
-
 
 QString HttpSslTransport::name() const
 {
     return QString::fromUtf8("HttpSslTransport");
 }
 
-
 bool HttpSslTransport::canHandle(const QString &address)
 {
     return address.startsWith("http+ssl://", Qt::CaseInsensitive);
 }
-
 
 END_LAFRPC_NAMESPACE
