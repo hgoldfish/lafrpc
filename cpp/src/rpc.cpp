@@ -554,6 +554,16 @@ void Rpc::setHeaderCallback(QSharedPointer<HeaderCallback> headerCallback)
     d->headerCallback = headerCallback;
 }
 
+QSharedPointer<qtng::BaseStreamServer> Rpc::createServer(const QString &address) 
+{
+    Q_D(Rpc);
+    QSharedPointer<Transport> transport = d->findTransport(address);
+    if (transport.isNull()) {
+        return QSharedPointer<qtng::BaseStreamServer>();
+    }
+    return transport->createServer(address);
+}
+
 QList<bool> Rpc::startServers(const QStringList &addresses, bool blocking)
 {
     Q_D(Rpc);
