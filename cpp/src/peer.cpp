@@ -307,7 +307,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
     QSharedPointer<Response> response;
     try {
-        response = waiter->wait();
+        response = waiter->tryWait();
         waiters.remove(request.id);
     } catch (CoroutineException &) {
         waiters.remove(request.id);
@@ -518,7 +518,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
                 return;
             }
             if (subChannelFromServer.isNull()) {
-                qCWarning(logger) << "can not make channel for the respone of" << request->methodName;
+                qCWarning(logger) << "can not make channel for the response of" << request->methodName;
                 QSharedPointer<RpcRemoteException> e(new RpcRemoteException("bad channel"));
                 response.exception.setValue(e);
             } else {
@@ -527,7 +527,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
                 if (streamFromServer->preferRawSocket) {
                     rawSocket = rpc->makeRawSocket(name, connectionId);
                     if (rawSocket.isNull() || connectionId.isEmpty()) {
-                        qCDebug(logger) << "can not make raw sockt to" << name << "for" << request->methodName;
+                        qCDebug(logger) << "can not make raw socket to" << name << "for" << request->methodName;
                     }
                     if (broken || rpc.isNull()) {
                         return;

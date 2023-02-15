@@ -195,7 +195,7 @@ bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir:
 bool RpcDirPrivate::readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback)
 {
     Q_Q(RpcDir);
-    if (!q->ready.wait()) {
+    if (!q->ready.tryWait()) {
         return false;
     }
     quint64 totalRead = 0;

@@ -259,7 +259,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerNameOrAddress)
     QSharedPointer<qtng::Event> event;
     if (connectingEvents.contains(peerAddress)) {
         event = connectingEvents.value(peerAddress);
-        event->wait();
+        event->tryWait();
         for (QSharedPointer<Peer> peer : peers.values()) {
             if (peer->address() == peerAddress) {
                 return peer;
