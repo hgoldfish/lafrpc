@@ -29,6 +29,7 @@ public:
 public:
     virtual QString name() const = 0;
     virtual QSharedPointer<qtng::DataChannel> connect(const QString &address);
+    QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address);
     virtual bool startServer(const QString &address);
     virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray &connectionId);
     virtual QSharedPointer<qtng::SocketLike> takeRawSocket(const QByteArray &connectionId);

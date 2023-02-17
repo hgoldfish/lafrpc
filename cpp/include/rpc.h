@@ -63,6 +63,7 @@ public:
     QSharedPointer<KcpFilter> kcpFilter() const;
     void setHeaderCallback(QSharedPointer<HeaderCallback> headerCallback);
 
+    QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address);
     QList<bool> startServers(const QStringList &addresses, bool blocking = true);
     bool startServer(const QString &address, bool blocking = true);
     QList<bool> stopServers(const QStringList &addresses = QStringList());

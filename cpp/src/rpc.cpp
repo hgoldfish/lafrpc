@@ -259,7 +259,7 @@ QSharedPointer<Peer> RpcPrivate::connect(const QString &peerNameOrAddress)
     QSharedPointer<qtng::Event> event;
     if (connectingEvents.contains(peerAddress)) {
         event = connectingEvents.value(peerAddress);
-        event->wait();
+        event->tryWait();
         for (QSharedPointer<Peer> peer : peers.values()) {
             if (peer->address() == peerAddress) {
                 return peer;
@@ -552,6 +552,16 @@ void Rpc::setHeaderCallback(QSharedPointer<HeaderCallback> headerCallback)
 {
     Q_D(Rpc);
     d->headerCallback = headerCallback;
+}
+
+QSharedPointer<qtng::BaseStreamServer> Rpc::createServer(const QString &address) 
+{
+    Q_D(Rpc);
+    QSharedPointer<Transport> transport = d->findTransport(address);
+    if (transport.isNull()) {
+        return QSharedPointer<qtng::BaseStreamServer>();
+    }
+    return transport->createServer(address);
 }
 
 QList<bool> Rpc::startServers(const QStringList &addresses, bool blocking)

@@ -38,25 +38,7 @@ bool Transport::parseAddress(const QString &address, QString &host, quint16 &por
 
 bool Transport::startServer(const QString &address)
 {
-    QString hostStr;
-    quint16 port;
-    bool valid = parseAddress(address, hostStr, port);
-    if (!valid) {
-        qCWarning(logger) << address << "is invalid url.";
-        return false;
-    }
-
-    HostAddress host(hostStr);
-    if (host.isNull()) {
-        const QList<HostAddress> &l = RpcPrivate::getPrivateHelper(rpc.data())->dnsCache->resolve(hostStr);
-        if (l.isEmpty()) {
-            qCWarning(logger) << "require ip address to start server.";
-            return false;
-        }
-        host = l.first();
-    }
-
-    QSharedPointer<BaseStreamServer> server = createServer(address, host, port);
+    QSharedPointer<BaseStreamServer> server = createServer(address);
     if (server.isNull()) {
         qCWarning(logger) << "can not create server for" << address;
         return false;
@@ -158,6 +140,34 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
         kcp->setMode(rpc->kcpMode());
         channel->setPayloadSizeHint(kcp->payloadSizeHint());
     }
+}
+
+QSharedPointer<BaseStreamServer> Transport::createServer(const QString &address)
+{
+    QString hostStr;
+    quint16 port;
+    bool valid = parseAddress(address, hostStr, port);
+    if (!valid) {
+        qCWarning(logger) << address << "is invalid url.";
+        return QSharedPointer<BaseStreamServer>();
+    }
+
+    HostAddress host(hostStr);
+    if (host.isNull()) {
+        const QList<HostAddress> &l = RpcPrivate::getPrivateHelper(rpc.data())->dnsCache->resolve(hostStr);
+        if (l.isEmpty()) {
+            qCWarning(logger) << "require ip address to start server.";
+            return QSharedPointer<BaseStreamServer>();
+        }
+        host = l.first();
+    }
+
+    QSharedPointer<BaseStreamServer> server = createServer(address, host, port);
+    if (server.isNull()) {
+        qCWarning(logger) << "can not create server for" << address;
+        return QSharedPointer<BaseStreamServer>();
+    }
+    return server;
 }
 
 bool Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rpcHeader)
@@ -285,6 +295,7 @@ KcpSocketWithFilter::KcpSocketWithFilter(HostAddress::NetworkLayerProtocol proto
     : KcpSocket(protocol)
     , rpc(rpc)
 {
+    setMode(rpc->kcpMode());
 }
 
 bool KcpSocketWithFilter::filter(char *data, qint32 *len, HostAddress *addr, quint16 *port)

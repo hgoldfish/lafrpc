@@ -56,10 +56,10 @@ bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
     q->channel->setCapacity(32);
 
     quint64 count = 0;
-    char buf[BLOCK_SIZE];
+    QByteArray buf(BLOCK_SIZE, Qt::Uninitialized);
     if (progressCallback) {
         while (count < size) {
-            qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
+            qint64 readBytes = f->read(buf.data(), qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
             if (readBytes < 0) {
                 qCWarning(logger) << "rpc file read error.";
                 progressCallback(-1, count, size);
@@ -68,7 +68,7 @@ bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
                 progressCallback(-1, count, size);
                 return false;
             }
-            bool success = q->channel->sendPacket(QByteArray(buf, static_cast<int>(readBytes)));
+            bool success = q->channel->sendPacket(buf.left(readBytes));
             if (!success) {
                 qCDebug(logger) << "rpc file send error.";
                 progressCallback(-1, count, size);
@@ -83,14 +83,14 @@ bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
         }
     } else {
         while (count < size) {
-            qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
+            qint64 readBytes = f->read(buf.data(), qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
             if (readBytes < 0) {
                 qCWarning(logger) << "rpc file read error.";
                 return false;
             } else if (readBytes == 0) {
                 return false;
             }
-            bool success = q->channel->sendPacket(QByteArray(buf, static_cast<int>(readBytes)));
+            bool success = q->channel->sendPacket(buf.left(readBytes));
             if (!success) {
                 qCDebug(logger) << "rpc file send error.";
                 return false;
@@ -115,8 +115,11 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
     }
     q->channel->setCapacity(32);
     quint64 count = static_cast<quint64>(header.size());
-    QCryptographicHash hasher(QCryptographicHash::Sha256);
+    QSharedPointer<QCryptographicHash> hasher;
     const bool doHash = !hash.isEmpty();
+    if (doHash) {
+        hasher.reset(new QCryptographicHash (QCryptographicHash::Sha256));
+    }
     if (progressCallback) {
         while (count < size) {
             const QByteArray &buf = q->channel->recvPacket();
@@ -137,7 +140,7 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
             }
             count += static_cast<quint64>(buf.size());
             if (doHash) {
-                hasher.addData(buf);
+                hasher->addData(buf);
             }
             bool keepGo = progressCallback(buf.size(), count, size);
             if (!keepGo) {
@@ -163,13 +166,13 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
             }
             count += static_cast<quint64>(buf.size());
             if (doHash) {
-                hasher.addData(buf);
+                hasher->addData(buf);
             }
         }
     }
 
     if (doHash) {
-        const QByteArray &myHash = hasher.result();
+        const QByteArray &myHash = hasher->result();
         if (myHash != hash) {
             qCDebug(logger) << "writeTo() got mismatched hash.";
             return false;
@@ -187,11 +190,11 @@ bool RpcFilePrivate::sendfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::P
             progressCallback(-1, 0, 0);
         return false;
     }
-    quint64 count = 0;
-    char buf[BLOCK_SIZE];
     if (progressCallback) {
+        quint64 count = 0;
+        QByteArray buf(BLOCK_SIZE, Qt::Uninitialized);
         while (count < size) {
-            qint64 readBytes = f->read(buf, qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
+            qint64 readBytes = f->read(buf.data(), qMin<qint64>(BLOCK_SIZE, static_cast<qint64>(size - count)));
             if (readBytes < 0) {
                 qCWarning(logger) << "rpc file read error.";
                 progressCallback(-1, count, size);
@@ -201,7 +204,7 @@ bool RpcFilePrivate::sendfileViaRawSocket(QSharedPointer<FileLike> f, RpcFile::P
                 return false;
             }
             // TODO use send() instead of sendall() to maxium the boundrate.
-            qint32 bs = q->rawSocket->sendall(buf, static_cast<qint32>(readBytes));
+            qint32 bs = q->rawSocket->sendall(buf.left(readBytes));
             if (bs != readBytes) {
                 qCDebug(logger) << "rpc file send error.";
                 progressCallback(-1, count, size);
@@ -386,7 +389,7 @@ bool RpcFile::readFromPath(ProgressCallback progressCallback)
 bool RpcFile::writeTo(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    if (!ready.wait()) {
+    if (!ready.tryWait()) {
         return false;
     }
     if (rawSocket.isNull()) {
@@ -399,7 +402,7 @@ bool RpcFile::writeTo(QSharedPointer<FileLike> f, RpcFile::ProgressCallback prog
 bool RpcFile::readFrom(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    if (!ready.wait()) {
+    if (!ready.tryWait()) {
         return false;
     }
     if (rawSocket.isNull()) {
@@ -412,7 +415,7 @@ bool RpcFile::readFrom(QSharedPointer<FileLike> f, RpcFile::ProgressCallback pro
 bool RpcFile::sendall(const QByteArray &data, ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    if (!ready.wait()) {
+    if (!ready.tryWait()) {
         return false;
     }
     if (rawSocket.isNull()) {
@@ -425,7 +428,7 @@ bool RpcFile::sendall(const QByteArray &data, ProgressCallback progressCallback)
 bool RpcFile::recvall(QByteArray &data, ProgressCallback progressCallback)
 {
     Q_D(RpcFile);
-    if (!ready.wait()) {
+    if (!ready.tryWait()) {
         return false;
     }
     if (rawSocket.isNull()) {
