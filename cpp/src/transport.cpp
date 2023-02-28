@@ -320,7 +320,7 @@ protected:
 QSharedPointer<SocketLike> KcpServerWithFilter::serverCreate()
 {
     QPointer<Rpc> rpc = static_cast<KcpTransport *>(userData())->rpc;
-    return asSocketLike(createServer<KcpSocketWithFilter>(
+    return asSocketLike(::createServer<KcpSocketWithFilter>(
             serverAddress(), serverPort(), 0,
             [rpc](HostAddress::NetworkLayerProtocol family) { return new KcpSocketWithFilter(family, rpc); }));
 }
