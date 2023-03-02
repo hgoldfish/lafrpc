@@ -143,6 +143,7 @@ struct Request
     QVariantMap header;
     quint32 channel;
     QByteArray rawSocket;
+    bool oneway = false;
 
     Request()
         : channel(0)

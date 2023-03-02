@@ -92,6 +92,7 @@ class Request:
     header = dict()
     channel = 0
     raw_socket = b""
+    one_way = False
 
 
     def is_ok(self):
@@ -113,24 +114,27 @@ class Request:
 
         if self.args is not None:
             if not isinstance(self.args, (tuple, list)):
-                logger.debug("Request.args is not list.")
+                logger.debug("Request.args is not list: %r", self.args)
                 return False
         if self.kwargs is not None:
             if not isinstance(self.kwargs, dict):
-                logger.debug("Request.kwargs is not dict.")
+                logger.debug("Request.kwargs is not dict: %r", self.kwargs)
                 return False
         if self.header is not None:
             if not isinstance(self.header, dict):
-                logger.debug("Request.header is not dict")
+                logger.debug("Request.header is not dict: %r", self.header)
                 return False
         if self.channel is not None and self.channel != 0:
             if not isinstance(self.channel, int):
-                logger.debug("Request.channel is not integer.")
+                logger.debug("Request.channel is not integer: %r", self.channel)
                 return False
         if self.raw_socket is not None:
             if not isinstance(self.raw_socket, (bytes, str)):
-                logger.debug("Request.raw_socket is not either bytes or string.")
+                logger.debug("Request.raw_socket is not either bytes or string: %r", self.raw_socket)
                 return False
+        if not isinstance(self.one_way, bool):
+            logger.debug("Request.one_way is not boolean: %r", self.one_way)
+            return False
         return True
 
 

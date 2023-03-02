@@ -16,6 +16,7 @@ public:
     explicit RpcFile();
     virtual ~RpcFile() override;
 public:
+    static QSharedPointer<RpcFile> prepareToSend(qint64 size);
     bool calculateHash();
     bool isValid() const;
 

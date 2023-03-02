@@ -1,13 +1,13 @@
-import weakref
-import logging
 import itertools
+import logging
+import weakref
 from typing import Optional
 
 from lafrpc.network import VirtualDataChannel
-from .deferred import Signal, Deferred
 from .base import RpcException, RpcDisconnectedException, RpcInternalException, RpcRemoteException, \
     RpcSerializationException, UseStream, Request, Response, is_exported
-from .serialization import SerializationException, DeserializationException
+from .deferred import Signal, Deferred
+from .serialization import BaseSerialization, SerializationException, DeserializationException
 from .utils import RegisterServicesMixin, RpcProxy, DeferredRpcProxy, create_uuid
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def recv(connection, size):
     return buf
 
 
-def pack_request(serialization, request: Request):
+def pack_request(serialization: BaseSerialization, request: Request, protocol_version: int):
     if not isinstance(request.id, bytes):
         request_id = request.id.encode("utf-8")
     else:
@@ -42,10 +42,13 @@ def pack_request(serialization, request: Request):
         request.channel,
         request.raw_socket,
     ]
+    if protocol_version >= 2:
+        data.append(request.one_way)
+
     return serialization.pack(data)
 
 
-def pack_response(serialization, response: Response):
+def pack_response(serialization: BaseSerialization, response: Response):
     if not isinstance(response.id, bytes):
         response_id = response.id.encode("utf-8")
     else:
@@ -63,9 +66,9 @@ def pack_response(serialization, response: Response):
     return serialization.pack(data)
 
 
-def unpack_request_or_response(serialization, data):
+def unpack_request_or_response(serialization: BaseSerialization, data: bytes):
     d = serialization.unpack(data)
-    if len(d) == 8 and d[0] == 1:
+    if 8 <= len(d) <= 9 and d[0] == 1:
         request = Request()
         request.id = d[1]
         request.method_name = d[2]
@@ -74,6 +77,8 @@ def unpack_request_or_response(serialization, data):
         request.header = d[5]
         request.channel = d[6]
         request.raw_socket = d[7]
+        if len(d) >= 9:
+            request.one_way = d[8]
         if not request.is_ok():
             if debug_protocol:
                 logger.debug("%r", d)
@@ -113,6 +118,7 @@ def default_auth_header_callback(header, method_name):
 
 class Peer(RegisterServicesMixin):
     disconnected: Signal
+    protocol_version = 1
 
     def __init__(self, name, channel, rpc):
         RegisterServicesMixin.__init__(self)
@@ -218,7 +224,7 @@ class Peer(RegisterServicesMixin):
             stream_from_client._init(self.rpc_ref(), UseStream.ClientSide | UseStream.ParamInRequest,
                                      sub_channel1, raw_socket)
         try:
-            request_bytes = pack_request(self.rpc_ref().serialization, request)
+            request_bytes = pack_request(self.rpc_ref().serialization, request, self.protocol_version)
         except SerializationException:
             raise RpcSerializationException(
                 "can not serialize request while calling remote method: {0}".format(method_name))
@@ -464,7 +470,6 @@ class Peer(RegisterServicesMixin):
             if debug_protocol:
                 logger.debug("can not send response packet to the peer: %s", self.channel.error.description)
             raise
-
 
         if response.exception is None and stream_from_server:
             # noinspection PyProtectedMember

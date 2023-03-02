@@ -98,7 +98,7 @@ class Rpc(RegisterServicesMixin):
     DefaultSerialization = "pickle"
 
     timeout = 10.0
-    peer_version = 1
+    protocol_version = 1
     # 根据 data channel 的设定，<= 0 时表示不修改。
     max_packet_size = 0
     payload_size_hint = 0
@@ -412,7 +412,7 @@ class Rpc(RegisterServicesMixin):
     #             return None
 
     def prepare_peer(self, channel, peer_name = None, peer_address = None):
-        my_header = {"peer_name": self.my_peer_name, "version": self.peer_version}
+        my_header = {"peer_name": self.my_peer_name, "version": self.protocol_version}
         # noinspection PyBroadException
         try:
             channel.send_packet_async(self.serialization.pack(my_header))
@@ -430,8 +430,10 @@ class Rpc(RegisterServicesMixin):
                 logger.debug("peer {} return mismatched peer_name: {}".format(peer_name, its_header["peer_name"]))
             return None
         its_peer_name = its_header["peer_name"]
+        its_protocol_version = its_header["version"]
 
         peer = Peer(its_peer_name, channel, self)
+        peer.protocol_version = min(self.protocol_version, its_protocol_version)
         peer.set_services(self.get_services())
         if self.auth_header_callback:
             peer.auth_header_callback = self.auth_header_callback

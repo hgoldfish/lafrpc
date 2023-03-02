@@ -325,6 +325,18 @@ static QByteArray calculateHash(const QString &filePath)
     return hasher.result();
 }
 
+QSharedPointer<RpcFile> RpcFile::prepareToSend(qint64 size)
+{
+    QSharedPointer<RpcFile> rpcFile = QSharedPointer<RpcFile>::create();
+    rpcFile->setName(randomBytes(8).toHex());
+    rpcFile->setSize(size);
+    QDateTime now = QDateTime::currentDateTime();
+    rpcFile->setCreated(now);
+    rpcFile->setModified(now);
+    rpcFile->setLastAccess(now);
+    return rpcFile;
+}
+
 bool RpcFile::calculateHash()
 {
     Q_D(RpcFile);
