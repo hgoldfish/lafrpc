@@ -193,6 +193,24 @@ class DataChannel:
                 tmp.append(channel)
         self.pending_channels.return_many_forcely(tmp)
         return found
+    
+    def peek_channel(self, channel_number: int=None):
+        if not self.is_ok():
+            return None
+        if channel_number is None:
+            return self.pending_channels.get()
+
+        tmp = []
+        found = None
+        while not self.pending_channels.empty():
+            channel = self.pending_channels.get()
+            tmp.append(channel)
+            if channel.channel_number == channel_number:
+                found = channel
+                break
+                
+        self.pending_channels.return_many_forcely(tmp)
+        return found
 
     def recv_packet(self) -> bytes:
         with self.lock:
@@ -285,11 +303,12 @@ class DataChannel:
                 channel_number = command["channel_number"]
                 if debug_protocol:
                     logger.debug("对端要求关闭虚拟通道，号码是: %d", channel_number)
-                self.take_channel(channel_number)
-                try:
-                    channel = self.channels[channel_number]()
-                except KeyError:
-                    return True
+                channel = self.take_channel(channel_number)
+                if channel is None:
+                    try:
+                        channel = self.channels[channel_number]()
+                    except KeyError:
+                        return True
                 if channel is not None:
                     self._clean_channel(channel_number, send_destroy_packet=False)
                     channel._parent = None
