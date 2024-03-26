@@ -273,7 +273,7 @@ class Peer(RegisterServicesMixin):
 
         if isinstance(response.result, UseStream):
             stream_from_server: UseStream = response.result
-            sub_channel2 = self.channel.get_channel(response.channel)
+            sub_channel2 = self.channel.take_channel(response.channel)
             if sub_channel2 is None:
                 message = ("remote method `{0}` returns an UseStream object, " +
                            "but there is no new channel.").format(method_name)
@@ -393,7 +393,7 @@ class Peer(RegisterServicesMixin):
         response.id = request.id
 
         if stream_from_client:
-            sub_channel1 = self.channel.get_channel(request.channel)
+            sub_channel1 = self.channel.take_channel(request.channel)
             if sub_channel1 is None:
                 logger.error("client send an UseSteam parameter, but there is no channel.")
                 response.exception = RpcRemoteException()
