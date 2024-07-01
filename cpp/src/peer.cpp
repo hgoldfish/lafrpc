@@ -372,6 +372,7 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
 void PeerPrivate::handlePacket()
 {
+    Q_Q(Peer);
     if (broken || rpc.isNull()) {
         return;
     }
@@ -383,12 +384,12 @@ void PeerPrivate::handlePacket()
         } catch (CoroutineException &) {
             return shutdown();
         } catch (...) {
-            qCWarning(logger) << "got unknown exception while receving packet.";
+            qCWarning(logger) << "got unknown exception while receiving packet.";
             return shutdown();
         }
 
         if (packet.isEmpty()) {
-            qCDebug(logger) << "channel disconnected while receiving packet:" << channel->errorString();
+            qCDebug(logger) << "channel disconnected while receiving packet:" << q->address() << channel->errorString();
             return shutdown();
         }
 
@@ -409,7 +410,7 @@ void PeerPrivate::handlePacket()
                 waiter->send(response);
             }
         } else {
-            qCDebug(logger) << "can not handle received packet." << packet;
+            qCDebug(logger) << "can not handle received packet." << q->address() << packet;
         }
     }
 }

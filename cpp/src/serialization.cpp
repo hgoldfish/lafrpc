@@ -105,7 +105,7 @@ QVariant Serialization::restoreState(const QVariant &data)
             return result;
         }
     } else {
-        qDebug() << "unknwon type:" << data.type();
+        qDebug() << "unknown type:" << data.type();
         throw RpcSerializationException();
     }
 }
