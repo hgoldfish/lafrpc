@@ -28,7 +28,7 @@ struct LoggingCallback
 struct KcpFilter
 {
     virtual ~KcpFilter();
-    virtual bool filter(qtng::KcpSocket *socket, char *data, qint32 *len, qtng::HostAddress *addr, quint16 *port) = 0;
+    virtual bool filter(QSharedPointer<qtng::SocketLike> socket, char *data, qint32 *len, qtng::HostAddress *addr, quint16 *port) = 0;
 };
 
 enum SerializationType {
@@ -55,8 +55,8 @@ public:
     void setPayloadSizeHint(quint32 payloadSizeHint);
     float keepaliveTimeout() const;
     void setKeepaliveTimeout(float keepaliveTimeout);
-    qtng::KcpSocket::Mode kcpMode() const;
-    void setKcpMode(qtng::KcpSocket::Mode mode);
+    qtng::KcpMode kcpMode() const;
+    void setKcpMode(qtng::KcpMode mode);
     QString myPeerName() const;
     QSharedPointer<Serialization> serialization() const;
     QSharedPointer<HeaderCallback> headerCallback() const;
@@ -136,7 +136,7 @@ public:
     RpcBuilder &headerCallback(QSharedPointer<HeaderCallback> headerCallback);
     RpcBuilder &loggingCallback(QSharedPointer<LoggingCallback> loggingCallback);
     RpcBuilder &kcpFilter(QSharedPointer<KcpFilter> kcpFilter);
-    RpcBuilder &kcpMode(qtng::KcpSocket::Mode kcpMode);
+    RpcBuilder &kcpMode(qtng::KcpMode kcpMode);
     RpcBuilder &maxPacketSize(quint32 maxPacketSize);
     RpcBuilder &payloadSizeHint(quint32 payloadSizeHint);
     RpcBuilder &keepaliveTimeout(float keepaliveTimeout);
