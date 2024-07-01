@@ -22,7 +22,7 @@ RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *
     : maxPacketSize(0)
     , payloadSizeHint(0)
     , keepaliveTimeout(1000 * 20)
-    , kcpMode(qtng::KcpSocket::Internet)
+    , kcpMode(qtng::KcpMode::Internet)
     , serialization(serialization)
     , operations(new qtng::CoroutineGroup)
     , dnsCache(new qtng::SocketDnsCache())
@@ -512,13 +512,13 @@ void Rpc::setKeepaliveTimeout(float keepaliveTimeout)
     d->keepaliveTimeout = static_cast<quint64>(keepaliveTimeout * 1000.0f);
 }
 
-qtng::KcpSocket::Mode Rpc::kcpMode() const
+qtng::KcpMode Rpc::kcpMode() const
 {
     Q_D(const Rpc);
     return d->kcpMode;
 }
 
-void Rpc::setKcpMode(qtng::KcpSocket::Mode mode)
+void Rpc::setKcpMode(qtng::KcpMode mode)
 {
     Q_D(Rpc);
     d->kcpMode = mode;
@@ -767,7 +767,7 @@ RpcBuilder &RpcBuilder::kcpFilter(QSharedPointer<KcpFilter> kcpFilter)
     return *this;
 }
 
-RpcBuilder &RpcBuilder::kcpMode(qtng::KcpSocket::Mode kcpMode)
+RpcBuilder &RpcBuilder::kcpMode(qtng::KcpMode kcpMode)
 {
     if (!rpc.isNull()) {
         rpc->d_func()->kcpMode = kcpMode;
