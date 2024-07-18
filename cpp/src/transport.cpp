@@ -123,7 +123,7 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
     channel->setKeepaliveTimeout(rpc->keepaliveTimeout());
 
     QSharedPointer<SslSocket> ssl = convertSocketLikeToSslSocket(request);
-    QSharedPointer<KcpSocket> kcp;
+    QSharedPointer<SocketLike> backend;
     if (!ssl.isNull()) {
         const QByteArray &certPEM = ssl->peerCertificate().save(Ssl::Pem);
         const QByteArray &certHash = ssl->peerCertificate().digest(MessageDigest::Sha256);
@@ -131,14 +131,15 @@ void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<
             channel->setProperty("peer_certificate", certPEM);
             channel->setProperty("peer_certificate_hash", certHash);
         }
-        kcp = convertSocketLikeToKcpSocket(ssl->backend());
+        backend = ssl->backend();
     } else {
-        kcp = convertSocketLikeToKcpSocket(request);
+        backend = request;
     }
 
-    if (!kcp.isNull()) {
-        kcp->setMode(rpc->kcpMode());
-        channel->setPayloadSizeHint(kcp->payloadSizeHint());
+    KcpSocketLikeHelper kcpHelper(backend);
+    if (kcpHelper.isValid()) {
+        kcpHelper.setMode(rpc->kcpMode());
+        channel->setPayloadSizeHint(kcpHelper.payloadSizeHint());
     }
 }
 
@@ -283,34 +284,11 @@ QString SslTransport::getAddressTemplate()
     return QStringLiteral("ssl://%1:%2");
 }
 
-class KcpSocketWithFilter : public KcpSocket
-{
-public:
-    KcpSocketWithFilter(HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc);
-    virtual bool filter(char *data, qint32 *len, HostAddress *addr, quint16 *port) override;
-    QPointer<Rpc> rpc;
-};
-
-KcpSocketWithFilter::KcpSocketWithFilter(HostAddress::NetworkLayerProtocol protocol, QPointer<Rpc> rpc)
-    : KcpSocket(protocol)
-    , rpc(rpc)
-{
-    setMode(rpc->kcpMode());
-}
-
-bool KcpSocketWithFilter::filter(char *data, qint32 *len, HostAddress *addr, quint16 *port)
-{
-    if (rpc.isNull() || rpc->kcpFilter().isNull()) {
-        return false;
-    }
-    return rpc->kcpFilter()->filter(this, data, len, addr, port);
-}
-
-class KcpServerWithFilter : public KcpServer<TcpTransportRequestHandler>
+class KcpServerWithFilter : public KcpServerV2<TcpTransportRequestHandler>
 {
 public:
     KcpServerWithFilter(const HostAddress &serverAddress, quint16 serverPort)
-        : KcpServer<TcpTransportRequestHandler>(serverAddress, serverPort)
+        : KcpServerV2<TcpTransportRequestHandler>(serverAddress, serverPort)
     {
     }
 protected:
@@ -320,22 +298,31 @@ protected:
 QSharedPointer<SocketLike> KcpServerWithFilter::serverCreate()
 {
     QPointer<Rpc> rpc = static_cast<KcpTransport *>(userData())->rpc;
-    return asSocketLike(::createServer<KcpSocketWithFilter>(
-            serverAddress(), serverPort(), 0,
-            [rpc](HostAddress::NetworkLayerProtocol family) { return new KcpSocketWithFilter(family, rpc); }));
+    QSharedPointer<SocketLike> kcp(createKcpServer(serverAddress(), serverPort(), 0, rpc->kcpMode()));
+    KcpSocketLikeHelper helper(kcp);
+    helper.setFilter([rpc, kcp] (char *data, qint32 *size, HostAddress *addr, quint16 *port) -> bool {
+        if (rpc.isNull() || rpc->kcpFilter().isNull()) {
+            return false;
+        }
+        return rpc->kcpFilter()->filter(kcp, data, size, addr, port);
+    });
+    return kcp;
 }
 
 QSharedPointer<SocketLike> KcpTransport::createConnection(const QString &, const QString &host, quint16 port,
                                                           QSharedPointer<SocketDnsCache> dnsCache)
 {
-    QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(
-            host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
-            [this](HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
-    if (kcp) {
-        return asSocketLike(kcp);
-    } else {
-        return QSharedPointer<SocketLike>();
-    }
+    QPointer<Rpc> rpc = this->rpc;
+    QSharedPointer<SocketLike> kcp(qtng::createKcpConnection(
+            host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol, rpc->kcpMode()));
+    KcpSocketLikeHelper helper(kcp);
+    helper.setFilter([rpc, kcp] (char *data, qint32 *size, HostAddress *addr, quint16 *port) -> bool {
+        if (rpc.isNull() || rpc->kcpFilter().isNull()) {
+            return false;
+        }
+        return rpc->kcpFilter()->filter(kcp, data, size, addr, port);
+    });
+    return kcp;
 }
 
 QSharedPointer<BaseStreamServer> KcpTransport::createServer(const QString &, const HostAddress &host, quint16 port)
@@ -365,11 +352,18 @@ typedef WithSsl<KcpServerWithFilter> SslKcpServerWithFilter;
 QSharedPointer<SocketLike> KcpSslTransport::createConnection(const QString &, const QString &host, quint16 port,
                                                              QSharedPointer<SocketDnsCache> dnsCache)
 {
-    QSharedPointer<KcpSocket> kcp(qtng::createConnection<KcpSocket>(
-            host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol,
-            [this](HostAddress::NetworkLayerProtocol protocol) { return new KcpSocketWithFilter(protocol, rpc); }));
+    QPointer<Rpc> rpc = this->rpc;
+    QSharedPointer<SocketLike> kcp(qtng::createKcpConnection(
+        host, port, nullptr, dnsCache, HostAddress::AnyIPProtocol, rpc->kcpMode()));
+    KcpSocketLikeHelper helper(kcp);
+    helper.setFilter([rpc, kcp] (char *data, qint32 *size, HostAddress *addr, quint16 *port) -> bool {
+        if (rpc.isNull() || rpc->kcpFilter().isNull()) {
+            return false;
+        }
+        return rpc->kcpFilter()->filter(kcp, data, size, addr, port);
+    });
     if (kcp) {
-        QSharedPointer<SslSocket> ssl(new SslSocket(asSocketLike(kcp), sslConfig));
+        QSharedPointer<SslSocket> ssl(new SslSocket(kcp, sslConfig));
         if (!ssl->handshake(false)) {
             return QSharedPointer<SocketLike>();
         }

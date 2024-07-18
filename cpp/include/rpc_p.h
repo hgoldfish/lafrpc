@@ -45,7 +45,7 @@ public:
     quint32 maxPacketSize;
     quint32 payloadSizeHint;
     quint64 keepaliveTimeout;
-    qtng::KcpSocket::Mode kcpMode;
+    qtng::KcpMode kcpMode;
     QMultiMap<QString, QSharedPointer<Peer>> peers;
     QSharedPointer<HeaderCallback> headerCallback;
     QSharedPointer<LoggingCallback> loggingCallback;
