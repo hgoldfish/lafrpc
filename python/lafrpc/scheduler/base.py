@@ -5,6 +5,12 @@ import socket
 import ssl
 import threading
 import time
+import weakref
+from collections.abc import Callable
+from typing import TypeVar
+from typing_extensions import ParamSpec
+_P = ParamSpec("_P")
+_R_co = TypeVar("_R_co", covariant=True)
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +112,25 @@ class ThreadEvent(threading.Event):
         else:
             return self.result
 
+class FunctionWrapper:
+    func: Callable[_P, _R_co]
+    scheduler: weakref.ref
+    task: weakref.ref
+    
+    def __init__(self, func: Callable[_P, _R_co], scheduler: weakref.ref):
+        self.func = func
+        self.scheduler = weakref.ref(scheduler)
+        self.task = None
+    @property
+    def __func__(self) -> Callable[_P, _R_co]:
+        return self.func
+    def __call__(self, *args, **kwargs):
+        result = self.func(*args, **kwargs)
+        if self.task is not None and self.scheduler is not None:
+            task = self.task()
+            scheduler = self.scheduler()
+            scheduler.delete_task(task)
+        return result
 
 class BaseScheduler:
     spawn_function = staticmethod(thread_spawn)
@@ -128,16 +153,25 @@ class BaseScheduler:
         return name in self.tasks
 
     def spawn(self, func, *args, **kwargs):
-        task = self.spawn_function(func, *args, **kwargs)
+        func_wrapper = FunctionWrapper(func, self)
+        task = self.spawn_function(func_wrapper, *args, **kwargs)
+        func_wrapper.task = weakref.ref(task)
         task_name = "task@" + str(id(task))
         self.tasks[task_name] = task
         return task
 
     def spawn_with_name(self, name: str, func, *args, **kwargs):
-        task = self.spawn_function(func, *args, **kwargs)
+        func_wrapper = FunctionWrapper(func, self)
+        task = self.spawn_function(func_wrapper, *args, **kwargs)
+        func_wrapper.task = weakref.ref(task)
         self.tasks[name] = task
         return task
-
+    
+    def delete_task(self, task):
+        for task_name, old_task in self.tasks.items():
+            if old_task is task:
+                del self.tasks[task_name]
+                return
     def kill(self, task_name: str, join=True):
         try:
             if join:
