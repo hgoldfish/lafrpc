@@ -126,9 +126,9 @@ class FunctionWrapper:
         return self.func
     def __call__(self, *args, **kwargs):
         result = self.func(*args, **kwargs)
-        if self.task is not None and self.scheduler is not None:
-            task = self.task()
-            scheduler = self.scheduler()
+        task = self.task()
+        scheduler = self.scheduler()
+        if task is not None and scheduler is not None:
             scheduler.delete_task(task)
         return result
 
