@@ -8,7 +8,7 @@
 
 static Q_LOGGING_CATEGORY(logger, "lafrpc.peer") using namespace qtng;
 
-#define DEUBG_RPC_PROTOCOL
+// #define DEUBG_RPC_PROTOCOL
 
 BEGIN_LAFRPC_NAMESPACE
 
@@ -290,6 +290,9 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
 
     QSharedPointer<Waiter> waiter(new Waiter());
     waiters.insert(request.id, waiter);
+#ifdef DEUBG_RPC_PROTOCOL
+    qCDebug(logger) << "start wait request" << request.id << methodName;
+#endif
 
     success = channel->sendPacket(requestBytes);
     if (!success) {
@@ -403,6 +406,9 @@ void PeerPrivate::handlePacket()
         if (what == GOT_REQUEST && request->isOk()) {
             operations->spawn([this, request] { handleRequest(request); });
         } else if (what == GOT_RESPONSE && response->isOk()) {
+#ifdef DEUBG_RPC_PROTOCOL
+            qCDebug(logger) << "got response" << response->id << "result:" << response->result;
+#endif
             QSharedPointer<ValueEvent<QSharedPointer<Response>>> waiter = waiters.value(response->id);
             if (waiter.isNull()) {
                 // qCDebug(logger) << "received a response from server, but waiter is gone: " << response->id;
@@ -623,32 +629,9 @@ int metaTypeOf(const char *typeNameBytes)
     }
 }
 
-QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, QVariantMap kwargs)
+// return method's arg not matched reason
+QString objectMethodArgMatchedError(const QMetaMethod &found, QVariantList &args, QList<QGenericArgument> &parameters)
 {
-    Q_UNUSED(kwargs);
-    const QMetaObject *metaObj = obj->metaObject();
-    if (!metaObj) {
-        throw RpcRemoteException("obj is not callable.");
-    }
-    if (args.size() > 9) {
-        throw RpcRemoteException("too many arguments.");
-    }
-    QMetaMethod found;
-    do {
-        for (int i = metaObj->methodOffset(); i < metaObj->methodCount(); ++i) {
-            const QMetaMethod &method = metaObj->method(i);
-            if (method.name() == methodName) {
-                found = method;
-                break;
-            }
-        }
-        metaObj = metaObj->superClass();
-    } while (metaObj && !found.isValid());
-
-    if (!found.isValid()) {
-        throw RpcRemoteException("method not found.");
-    }
-
     const QList<QByteArray> &parameterTypeNames = found.parameterTypes();
     const QList<QByteArray> &parameterNames = found.parameterNames();
     QList<int> parameterTypes;
@@ -656,15 +639,14 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
         parameterTypes.append(found.parameterType(i));
     }
     if (parameterTypeNames.size() != parameterNames.size()) {
-        throw RpcRemoteException("parameter names and types do not match.");
+        return "parameter names and types do not match.";
     }
     if (parameterTypeNames.size() != parameterTypes.size()) {
-        throw RpcRemoteException("parameter type ids and names do not match.");
+        return "parameter type ids and names do not match.";
     }
     if (args.size() != parameterTypes.size()) {
-        throw RpcRemoteException("the size of past args do not match the parameter count of method.");
+        return "the size of past args do not match the parameter count of method.";
     }
-    QList<QGenericArgument> parameters;
     for (int i = 0; i < parameterTypes.size(); ++i) {
         int typeId = parameterTypes.at(i);
         const QByteArray &typeName = parameterTypeNames.at(i);
@@ -673,8 +655,7 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
         if (arg.isValid()) {
             if (!arg.convert(typeId)) {
                 QString message = "the parameter %1 with type %2 can not accept the past argument.";
-                message = message.arg(QString::fromUtf8(parameterName)).arg(QString::fromUtf8(typeName));
-                throw RpcRemoteException(message);
+                return message.arg(QString::fromUtf8(parameterName), QString::fromUtf8(typeName));
             }
         } else {
             // xxx for null shared_pointer
@@ -686,17 +667,51 @@ QVariant objectCall(QObject *obj, const QString &methodName, QVariantList args, 
     for (int i = parameters.size(); i < 10; ++i) {
         parameters.append(QGenericArgument());
     }
+    return QString();
+}
 
-    int rtype = metaTypeOf(found.typeName());
-    if (!rtype) {
-        throw RpcRemoteException(QString::fromUtf8("unknown return type: %1").arg(found.typeName()));
+QVariant objectCall(QObject *obj, const QString &methodName, const QVariantList &args, QVariantMap kwargs)
+{
+    Q_UNUSED(kwargs);
+    const QMetaObject *metaObj = obj->metaObject();
+    if (!metaObj) {
+        throw RpcRemoteException("obj is not callable.");
     }
-    QVariant rvalue(rtype, QMetaType::create(rtype));
-    QGenericReturnArgument rarg(found.typeName(), rvalue.data());
+    if (args.size() > 9) {
+        throw RpcRemoteException("too many arguments.");
+    }
 
-    found.invoke(obj, Qt::DirectConnection, rarg, parameters[0], parameters[1], parameters[2], parameters[3],
-                 parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9]);
-    return rvalue;
+    QString lastError;
+    while (true) {
+        for (int i = metaObj->methodOffset(); i < metaObj->methodCount(); ++i) {
+            const QMetaMethod &found = metaObj->method(i);
+            if (found.name() != methodName) {
+                continue;
+            }
+            QList<QGenericArgument> parameters; // parameters.size() == 10
+            QVariantList newArg(args); // may be changed
+            QString error = objectMethodArgMatchedError(found, newArg, parameters);
+            if (!error.isEmpty()) {
+                lastError = error;
+                continue;
+            }
+            int rtype = metaTypeOf(found.typeName());
+            if (!rtype) {
+                throw RpcRemoteException(QString::fromUtf8("unknown return type: %1").arg(found.typeName()));
+            }
+            QVariant rvalue(rtype, QMetaType::create(rtype));
+            QGenericReturnArgument rarg(found.typeName(), rvalue.data());
+
+            found.invoke(obj, Qt::DirectConnection, rarg, parameters[0], parameters[1], parameters[2], parameters[3],
+                parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9]);
+            return rvalue;
+        }
+        metaObj = metaObj->superClass();
+        if (!metaObj) {
+            break;
+        }
+    }
+    throw RpcRemoteException(lastError.isEmpty() ? methodName + " method not found." : lastError);
 }
 
 QVariant PeerPrivate::lookupAndCall(const QString &methodName, const QVariantList &args, const QVariantMap &kwargs,
