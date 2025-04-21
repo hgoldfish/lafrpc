@@ -48,6 +48,9 @@ RpcFilePrivate::RpcFilePrivate(RpcFile *q)
 bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::ProgressCallback progressCallback)
 {
     Q_Q(RpcFile);
+    if (q->channel.isNull()) {
+        return false;
+    }
     if (size == 0) {
         if (progressCallback)
             progressCallback(0, 0, 0);
@@ -108,6 +111,9 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
                                         const QByteArray &header)
 {
     Q_Q(RpcFile);
+    if (q->channel.isNull()) {
+        return false;
+    }
     if (size == 0) {
         if (progressCallback)
             progressCallback(0, 0, 0);
