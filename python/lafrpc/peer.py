@@ -205,42 +205,43 @@ class Peer(RegisterServicesMixin):
         if not self.is_ok():
             raise RpcDisconnectedException("Peer is disconnected.")
 
-        if stream_from_client:
-            sub_channel1 = self.channel.make_channel()
-            request.channel = sub_channel1.channel_number
-            if debug_protocol:
-                logger.debug("%r, %r, %r", stream_from_client.prefer_raw_socket, self.rpc_ref(), self._peer_name)
-            raw_socket = None
-            if stream_from_client.prefer_raw_socket and self.rpc_ref() is not None and self._peer_name:
-                connection, connection_id = self.rpc_ref().make_raw_socket(self._peer_name)
-                if connection:
-                    request.raw_socket = connection_id
-                    raw_socket = connection
-                else:
-                    if debug_protocol:
-                        logger.debug("can not create raw socket to %s, maybe "
-                                     "firewall exists or resist in different network.")
-            # noinspection PyProtectedMember
-            stream_from_client._init(self.rpc_ref(), UseStream.ClientSide | UseStream.ParamInRequest,
-                                     sub_channel1, raw_socket)
         try:
-            request_bytes = pack_request(self.rpc_ref().serialization, request, self.protocol_version)
-        except SerializationException:
-            raise RpcSerializationException(
-                "can not serialize request while calling remote method: {0}".format(method_name))
-        try:
-            self.channel.send_packet(request_bytes)
-        except IOError:
-            if debug_protocol:
-                logger.debug("can not send request to the other peer: %s", self.channel.error.description)
-            raise
+            if stream_from_client:
+                sub_channel1 = self.channel.make_channel()
+                request.channel = sub_channel1.channel_number
+                if debug_protocol:
+                    logger.debug("%r, %r, %r", stream_from_client.prefer_raw_socket, self.rpc_ref(), self._peer_name)
+                raw_socket = None
+                if stream_from_client.prefer_raw_socket and self.rpc_ref() is not None and self._peer_name:
+                    connection, connection_id = self.rpc_ref().make_raw_socket(self._peer_name)
+                    if connection:
+                        request.raw_socket = connection_id
+                        raw_socket = connection
+                    else:
+                        if debug_protocol:
+                            logger.debug("can not create raw socket to %s, maybe "
+                                        "firewall exists or resist in different network.")
+                # noinspection PyProtectedMember
+                stream_from_client._init(self.rpc_ref(), UseStream.ClientSide | UseStream.ParamInRequest,
+                                        sub_channel1, raw_socket)
+            try:
+                request_bytes = pack_request(self.rpc_ref().serialization, request, self.protocol_version)
+            except SerializationException:
+                raise RpcSerializationException(
+                    "can not serialize request while calling remote method: {0}".format(method_name))
+            try:
+                self.channel.send_packet(request_bytes)
+            except IOError:
+                if debug_protocol:
+                    logger.debug("can not send request to the other peer: %s", self.channel.error.description)
+                raise
 
-        if not self.is_ok():
-            raise RpcDisconnectedException("rpc is gone.")
-
-        if stream_from_client:
-            # noinspection PyProtectedMember
-            stream_from_client._set_ready()
+            if not self.is_ok():
+                raise RpcDisconnectedException("rpc is gone.")
+        finally:
+            if stream_from_client:
+                # noinspection PyProtectedMember
+                stream_from_client._set_ready()
 
         io_scheduler = self.rpc_ref().io_scheduler
         waiter = io_scheduler.Event()
@@ -273,24 +274,26 @@ class Peer(RegisterServicesMixin):
 
         if isinstance(response.result, UseStream):
             stream_from_server: UseStream = response.result
-            sub_channel2 = self.channel.take_channel(response.channel)
-            if sub_channel2 is None:
-                message = ("remote method `{0}` returns an UseStream object, " +
-                           "but there is no new channel.").format(method_name)
-                raise RpcInternalException(message)
-            raw_socket = None
-            if response.raw_socket:
-                connection = self.rpc_ref().get_raw_socket(response.raw_socket)
-                if connection is None:
-                    message = ("remote method `{0}` returns an UseStream(with raw socket), " +
-                               "but there is no raw socket.").format(method_name)
+            try:
+                sub_channel2 = self.channel.take_channel(response.channel)
+                if sub_channel2 is None:
+                    message = ("remote method `{0}` returns an UseStream object, " +
+                            "but there is no new channel.").format(method_name)
                     raise RpcInternalException(message)
-                raw_socket = connection
-            # noinspection PyProtectedMember
-            stream_from_server._init(self.rpc_ref(), UseStream.ClientSide | UseStream.ValueOfResponse,
-                                     sub_channel2, raw_socket)
-            # noinspection PyProtectedMember
-            stream_from_server._set_ready()
+                raw_socket = None
+                if response.raw_socket:
+                    connection = self.rpc_ref().get_raw_socket(response.raw_socket)
+                    if connection is None:
+                        message = ("remote method `{0}` returns an UseStream(with raw socket), " +
+                                "but there is no raw socket.").format(method_name)
+                        raise RpcInternalException(message)
+                    raw_socket = connection
+                # noinspection PyProtectedMember
+                stream_from_server._init(self.rpc_ref(), UseStream.ClientSide | UseStream.ValueOfResponse,
+                                        sub_channel2, raw_socket)
+            finally:
+                # noinspection PyProtectedMember
+                stream_from_server._set_ready()
         return response.result
 
     def handle_packet(self):
@@ -393,27 +396,28 @@ class Peer(RegisterServicesMixin):
         response.id = request.id
 
         if stream_from_client:
-            sub_channel1 = self.channel.take_channel(request.channel)
-            if sub_channel1 is None:
-                logger.error("client send an UseSteam parameter, but there is no channel.")
-                response.exception = RpcRemoteException()
-            else:
-                raw_socket = None
-                if request.raw_socket:
-                    connection = self.rpc_ref().get_raw_socket(request.raw_socket)
-                    if connection is None:
-                        logger.error("client send an UseSteam(with raw socket), but there is no raw socket.")
-                        response.exception = RpcRemoteException()
-                    else:
-                        stream_from_client.raw_socket = connection
-                # noinspection PyProtectedMember
-                stream_from_client._init(self.rpc_ref(), UseStream.ServerSide | UseStream.ParamInRequest,
-                                         sub_channel1, raw_socket)
-
-        if response.exception is None:
-            if stream_from_client is not None:
+            try:
+                sub_channel1 = self.channel.take_channel(request.channel)
+                if sub_channel1 is None:
+                    logger.error("client send an UseSteam parameter, but there is no channel.")
+                    response.exception = RpcRemoteException()
+                else:
+                    raw_socket = None
+                    if request.raw_socket:
+                        connection = self.rpc_ref().get_raw_socket(request.raw_socket)
+                        if connection is None:
+                            logger.error("client send an UseSteam(with raw socket), but there is no raw socket.")
+                            response.exception = RpcRemoteException()
+                        else:
+                            stream_from_client.raw_socket = connection
+                    # noinspection PyProtectedMember
+                    stream_from_client._init(self.rpc_ref(), UseStream.ServerSide | UseStream.ParamInRequest,
+                                            sub_channel1, raw_socket)
+            finally:
                 # noinspection PyProtectedMember
                 stream_from_client._set_ready()
+
+        if response.exception is None:
             # noinspection PyBroadException
             try:
                 result = self.lookup_method_and_call(request.method_name, request.args, request.kwargs, request.header)
@@ -441,39 +445,39 @@ class Peer(RegisterServicesMixin):
                 response.exception = RpcRemoteException("unknown error.")
 
         stream_from_server = None
-
-        if isinstance(response.result, UseStream):
-            stream_from_server = response.result
-            # 理论上使用 thread io scheduler 的情况下，有可能先运行 RpcFile 的 wait_for_ready() 函数
-            # noinspection PyProtectedMember
-            stream_from_server._init(self.rpc_ref(), UseStream.ServerSide | UseStream.ValueOfResponse, None, None)
-            sub_channel2 = self.channel.make_channel()
-            response.channel = sub_channel2.channel_number
-            raw_socket = None
-            if stream_from_server.prefer_raw_socket:
-                connection, connection_id = self.rpc_ref().make_raw_socket(self._peer_name)
-                if connection is not None:
-                    response.raw_socket = connection_id
-                    raw_socket = connection
-                else:
-                    message = ("can not create raw socket to {0} " +
-                               "maybe firewalls exist, or resist in different network.").format(self._peer_name)
-                    logger.debug(message)
-            # noinspection PyProtectedMember
-            stream_from_server._init(self.rpc_ref(), UseStream.ServerSide | UseStream.ValueOfResponse,
-                                     sub_channel2, raw_socket)
-
-        response_bytes = pack_response(self.rpc_ref().serialization, response)
         try:
-            self.channel.send_packet(response_bytes)
-        except IOError:
-            if debug_protocol:
-                logger.debug("can not send response packet to the peer: %s", self.channel.error.description)
-            raise
+            if isinstance(response.result, UseStream):
+                stream_from_server = response.result
+                # 理论上使用 thread io scheduler 的情况下，有可能先运行 RpcFile 的 wait_for_ready() 函数
+                # noinspection PyProtectedMember
+                stream_from_server._init(self.rpc_ref(), UseStream.ServerSide | UseStream.ValueOfResponse, None, None)
+                sub_channel2 = self.channel.make_channel()
+                response.channel = sub_channel2.channel_number
+                raw_socket = None
+                if stream_from_server.prefer_raw_socket:
+                    connection, connection_id = self.rpc_ref().make_raw_socket(self._peer_name)
+                    if connection is not None:
+                        response.raw_socket = connection_id
+                        raw_socket = connection
+                    else:
+                        message = ("can not create raw socket to {0} " +
+                                "maybe firewalls exist, or resist in different network.").format(self._peer_name)
+                        logger.debug(message)
+                # noinspection PyProtectedMember
+                stream_from_server._init(self.rpc_ref(), UseStream.ServerSide | UseStream.ValueOfResponse,
+                                        sub_channel2, raw_socket)
 
-        if response.exception is None and stream_from_server:
-            # noinspection PyProtectedMember
-            stream_from_server._set_ready()
+            response_bytes = pack_response(self.rpc_ref().serialization, response)
+            try:
+                self.channel.send_packet(response_bytes)
+            except IOError:
+                if debug_protocol:
+                    logger.debug("can not send response packet to the peer: %s", self.channel.error.description)
+                raise
+        finally:
+            if stream_from_server:
+                # noinspection PyProtectedMember
+                stream_from_server._set_ready()
 
     def lookup_method_and_call(self, method_name, args, kwargs, header):
         if not self.is_ok():

@@ -125,7 +125,10 @@ class FunctionWrapper:
     def __func__(self) -> Callable[_P, _R_co]:
         return self.func
     def __call__(self, *args, **kwargs):
-        result = self.func(*args, **kwargs)
+        try:
+            result = self.func(*args, **kwargs)
+        except Exception as e:
+            raise e
         task = self.task()
         scheduler = self.scheduler()
         if task is not None and scheduler is not None:
@@ -161,6 +164,16 @@ class BaseScheduler:
         return task
 
     def spawn_with_name(self, name: str, func, *args, **kwargs):
+        try:
+            old_task = self.tasks.get(name)
+        except KeyError:
+            pass
+
+        if old_task is not None:
+            old_task.kill()
+            self.delete_task(old_task)
+            old_task.join()
+
         func_wrapper = FunctionWrapper(func, self)
         task = self.spawn_function(func_wrapper, *args, **kwargs)
         func_wrapper.task = weakref.ref(task)
