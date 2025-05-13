@@ -114,6 +114,12 @@ RpcDirPrivate::RpcDirPrivate(RpcDir *q)
 bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback)
 {
     Q_Q(RpcDir);
+    if (!q->ready.tryWait()) {
+        return false;
+    }
+    if (q->channel.isNull()) {
+        return false;
+    }
     quint64 totalWritten = 0;
     for (const RpcDirFileEntry &entry : entries) {
         if (entry.isdir) {
@@ -196,6 +202,9 @@ bool RpcDirPrivate::readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir
 {
     Q_Q(RpcDir);
     if (!q->ready.tryWait()) {
+        return false;
+    }
+    if (q->channel.isNull()) {
         return false;
     }
     quint64 totalRead = 0;

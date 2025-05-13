@@ -80,6 +80,8 @@ class RpcFile(UseStream):
         if self.size == 0:
             return
         self.wait_for_ready()
+        if self.channel is None:
+            return
         count = begin
         self.channel.capacity = 32
         if self.hash:
@@ -122,6 +124,8 @@ class RpcFile(UseStream):
         if self.size == 0:
             return
         self.wait_for_ready()
+        if self.channel is None:
+            return
         self.channel.capacity = 32
 
         count = 0
