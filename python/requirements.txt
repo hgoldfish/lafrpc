@@ -1,4 +1,4 @@
-eventlet==0.35.2
+eventlet==0.40.3
 gevent==23.9.1
 greenlet==3.0.0
 qdatastream==0.1.2
