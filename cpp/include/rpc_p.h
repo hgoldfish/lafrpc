@@ -44,7 +44,7 @@ public:
     QString myPeerName;
     quint32 maxPacketSize;
     quint32 payloadSizeHint;
-    quint64 keepaliveTimeout;
+    qint64 keepaliveTimeout;
     qtng::KcpMode kcpMode;
     QMultiMap<QString, QSharedPointer<Peer>> peers;
     QSharedPointer<HeaderCallback> headerCallback;

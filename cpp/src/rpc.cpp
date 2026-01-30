@@ -21,7 +21,7 @@ KcpFilter::~KcpFilter() { }
 RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *parent)
     : maxPacketSize(0)
     , payloadSizeHint(0)
-    , keepaliveTimeout(1000 * 20)
+    , keepaliveTimeout(-1)
     , kcpMode(qtng::KcpMode::Internet)
     , serialization(serialization)
     , operations(new qtng::CoroutineGroup)
@@ -385,6 +385,9 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
 #endif
         return empty;
     }
+#ifdef DEUBG_RPC_PROTOCOL
+    qCDebug(logger) << "preparePeer" << peerAddress;
+#endif
 
     QVariantMap itsHeader = serialization->unpack(packet).toMap();
     if (itsHeader.isEmpty()) {
@@ -509,7 +512,7 @@ float Rpc::keepaliveTimeout() const
 void Rpc::setKeepaliveTimeout(float keepaliveTimeout)
 {
     Q_D(Rpc);
-    d->keepaliveTimeout = static_cast<quint64>(keepaliveTimeout * 1000.0f);
+    d->keepaliveTimeout = static_cast<qint64>(keepaliveTimeout * 1000.0f);
 }
 
 qtng::KcpMode Rpc::kcpMode() const
@@ -794,7 +797,7 @@ RpcBuilder &RpcBuilder::payloadSizeHint(quint32 payloadSizeHint)
 RpcBuilder &RpcBuilder::keepaliveTimeout(float keepaliveTimeout)
 {
     if (!rpc.isNull()) {
-        rpc->d_func()->keepaliveTimeout = static_cast<quint64>(keepaliveTimeout * 1000.0f);
+        rpc->d_func()->keepaliveTimeout = static_cast<qint64>(keepaliveTimeout * 1000.0f);
     }
     return *this;
 }
