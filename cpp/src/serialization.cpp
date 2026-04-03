@@ -40,7 +40,7 @@ QVariant Serialization::saveState(const QVariant &obj)
             result.insert(itor.key(), saveState(itor.value()));
         }
         return result;
-    } else if (type == QMetaType::QVariant) {
+    } else if (type == static_cast<QVariant::Type>(QMetaType::QVariant)) {
         return saveState(&obj);
     } else {
         for (QMap<QString, detail::SerializableInfo>::const_iterator itor = classes.constBegin();
