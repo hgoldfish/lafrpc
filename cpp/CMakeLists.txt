@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.1.0...3.28 FATAL_ERROR)
 
 project(lafrpc)
 
+# add EXCLUDE_FROM_ALL to tell cmake do not make libqtnetwokng.a
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../qtnetworkng/qtnetworkng.h")
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../qtnetworkng/" qtnetworkng EXCLUDE_FROM_ALL)
 else()

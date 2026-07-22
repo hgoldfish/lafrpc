@@ -436,7 +436,6 @@ void PeerPrivate::handlePacket()
 void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 {
     Q_Q(Peer);
-    bool success;
     if (broken || rpc.isNull()) {
         return;
     }
@@ -579,7 +578,7 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
         return;
     }
 
-    success = channel->sendPacket(responseBytes);
+    channel->sendPacket(responseBytes);
 }
 
 QByteArray removeNamespace(const QByteArray &typeName)
