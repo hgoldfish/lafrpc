@@ -92,6 +92,7 @@ public:
 public:
     bool writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback);
     bool readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback);
+    void failAndAbort(RpcDir::ProgressCallback progressCallback, const CallbackInfo &info);
 public:
     QString name;
     QString dirPath;
@@ -111,6 +112,17 @@ RpcDirPrivate::RpcDirPrivate(RpcDir *q)
 {
 }
 
+void RpcDirPrivate::failAndAbort(RpcDir::ProgressCallback progressCallback, const CallbackInfo &info)
+{
+    Q_Q(RpcDir);
+    if (progressCallback) {
+        progressCallback(info);
+    }
+    if (!q->channel.isNull()) {
+        q->channel->abort();
+    }
+}
+
 bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir::ProgressCallback progressCallback)
 {
     Q_Q(RpcDir);
@@ -120,79 +132,76 @@ bool RpcDirPrivate::writeTo(QSharedPointer<RpcDirFileProvider> provider, RpcDir:
     if (q->channel.isNull()) {
         return false;
     }
+    q->channel->setCapacity(8 * 1024 * 1024);
     quint64 totalWritten = 0;
     for (const RpcDirFileEntry &entry : entries) {
         if (entry.isdir) {
             if (!provider->createDirectory(entry.path)) {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, -1, 0, 0, totalWritten, this->size));
+                failAndAbort(progressCallback, CallbackInfo(entry.path, -1, 0, 0, totalWritten, this->size));
                 return false;
-            } else {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, 0, 0, 0, totalWritten, this->size));
             }
-        } else if (entry.size == 0) {
+            if (progressCallback) {
+                if (!progressCallback(CallbackInfo(entry.path, 0, 0, 0, totalWritten, this->size))) {
+                    q->channel->abort();
+                    return true;
+                }
+            }
+            continue;
+        }
+        if (entry.size == 0) {
             QSharedPointer<FileLike> file = provider->getFile(entry.path, QIODevice::WriteOnly);
             if (file.isNull()) {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, -1, 0, 0, totalWritten, this->size));
-                return false;
-            } else {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, 0, 0, 0, totalWritten, this->size));
-            }
-        } else {
-            QSharedPointer<FileLike> file = provider->getFile(entry.path, QIODevice::WriteOnly);
-            if (file.isNull()) {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, -1, 0, entry.size, totalWritten, this->size));
+                failAndAbort(progressCallback, CallbackInfo(entry.path, -1, 0, 0, totalWritten, this->size));
                 return false;
             }
-            QSharedPointer<DataChannel> channel = q->channel->makeChannel();
-            if (channel.isNull()) {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, -1, 0, entry.size, totalWritten, this->size));
-                return false;
+            if (progressCallback) {
+                if (!progressCallback(CallbackInfo(entry.path, 0, 0, 0, totalWritten, this->size))) {
+                    q->channel->abort();
+                    return true;
+                }
             }
+            continue;
+        }
 
-            quint64 fileWritten = 0;
-            while (fileWritten < entry.size) {
-                const QByteArray &buf = channel->recvPacket();
-                if (buf.isEmpty()) {
-                    if (progressCallback)
-                        progressCallback(
-                                CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
-                    return false;
-                }
-                if (file->write(buf.data(), buf.size()) != buf.size()) {
-                    if (progressCallback)
-                        progressCallback(
-                                CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
-                    return false;
-                }
-                fileWritten += static_cast<quint64>(buf.size());
-                totalWritten += static_cast<quint64>(buf.size());
-                if (progressCallback) {
-                    bool keepGoing = progressCallback(
-                            CallbackInfo(entry.path, buf.size(), fileWritten, entry.size, totalWritten, this->size));
-                    if (!keepGoing) {
-                        return true;
-                    }
-                }
-            }
-            if (fileWritten > entry.size) {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
+        QSharedPointer<FileLike> file = provider->getFile(entry.path, QIODevice::WriteOnly);
+        if (file.isNull()) {
+            failAndAbort(progressCallback, CallbackInfo(entry.path, -1, 0, entry.size, totalWritten, this->size));
+            return false;
+        }
+
+        quint64 fileWritten = 0;
+        while (fileWritten < entry.size) {
+            const QByteArray &buf = q->channel->recvPacket();
+            if (buf.isEmpty()) {
+                failAndAbort(progressCallback,
+                             CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
                 return false;
-            } else {
-                bool ok = provider->updateTimes(entry.path, entry.created, entry.lastModified, entry.lastAccess);
-                if (!ok) {
-                    if (progressCallback)
-                        progressCallback(
-                                CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
-                    return false;
+            }
+            if (fileWritten + static_cast<quint64>(buf.size()) > entry.size) {
+                failAndAbort(progressCallback,
+                             CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
+                return false;
+            }
+            if (file->write(buf.data(), buf.size()) != buf.size()) {
+                failAndAbort(progressCallback,
+                             CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
+                return false;
+            }
+            fileWritten += static_cast<quint64>(buf.size());
+            totalWritten += static_cast<quint64>(buf.size());
+            if (progressCallback) {
+                bool keepGoing = progressCallback(
+                        CallbackInfo(entry.path, buf.size(), fileWritten, entry.size, totalWritten, this->size));
+                if (!keepGoing) {
+                    q->channel->abort();
+                    return true;
                 }
             }
+        }
+        if (!provider->updateTimes(entry.path, entry.created, entry.lastModified, entry.lastAccess)) {
+            failAndAbort(progressCallback,
+                         CallbackInfo(entry.path, -1, fileWritten, entry.size, totalWritten, this->size));
+            return false;
         }
     }
     return true;
@@ -207,53 +216,62 @@ bool RpcDirPrivate::readFrom(QSharedPointer<RpcDirFileProvider> provider, RpcDir
     if (q->channel.isNull()) {
         return false;
     }
+    q->channel->setCapacity(8 * 1024 * 1024);
     quint64 totalRead = 0;
     QByteArray buf(1024 * 64, Qt::Uninitialized);
     for (const RpcDirFileEntry &entry : entries) {
         if (entry.isdir || entry.size == 0) {
-            if (progressCallback)
-                progressCallback(CallbackInfo(entry.path, 0, 0, 0, totalRead, this->size));
-        } else {
-            QSharedPointer<FileLike> file = provider->getFile(entry.path, QIODevice::ReadOnly);
-            if (file.isNull()) {
-                if (progressCallback)
-                    progressCallback(CallbackInfo(entry.path, -1, 0, entry.size, totalRead, this->size));
+            if (progressCallback) {
+                if (!progressCallback(CallbackInfo(entry.path, 0, 0, 0, totalRead, this->size))) {
+                    q->channel->abort();
+                    return true;
+                }
+            }
+            continue;
+        }
+
+        QSharedPointer<FileLike> file = provider->getFile(entry.path, QIODevice::ReadOnly);
+        if (file.isNull()) {
+            failAndAbort(progressCallback, CallbackInfo(entry.path, -1, 0, entry.size, totalRead, this->size));
+            return false;
+        }
+
+        quint64 fileRead = 0;
+        qint32 blockSize = static_cast<qint32>(q->channel->payloadSizeHint());
+        if (blockSize <= 0) {
+            blockSize = 1024 * 32;
+        }
+        if (buf.size() < blockSize) {
+            buf.resize(blockSize);
+        }
+        while (fileRead < entry.size) {
+            const qint64 remaining = static_cast<qint64>(entry.size - fileRead);
+            const qint32 toRead = static_cast<qint32>(qMin<qint64>(blockSize, remaining));
+            qint32 bs = file->read(buf.data(), toRead);
+            if (bs <= 0) {
+                failAndAbort(progressCallback,
+                             CallbackInfo(entry.path, -1, fileRead, entry.size, totalRead, this->size));
                 return false;
             }
-            QSharedPointer<DataChannel> channel = q->channel->takeChannel();
-            if (channel.isNull()) {
-                if (progressCallback)
-                    progressCallback(CallbackInfo("", -1, 0, 0, totalRead, this->size));
+            if (!q->channel->sendPacket(QByteArray(buf.data(), bs))) {
+                failAndAbort(progressCallback,
+                             CallbackInfo(entry.path, -1, fileRead, entry.size, totalRead, this->size));
                 return false;
             }
-            quint64 fileRead = 0;
-            qint32 blockSize = static_cast<qint32>(channel->payloadSizeHint());
-            while (fileRead < entry.size) {
-                qint32 bs = file->read(buf.data(), blockSize);
-                if (bs <= 0) {
-                    if (progressCallback)
-                        progressCallback(CallbackInfo(entry.path, -1, fileRead, entry.size, totalRead, this->size));
-                    return false;
-                }
-                if (!channel->sendPacket(QByteArray(buf.data(), bs))) {
-                    if (progressCallback)
-                        progressCallback(CallbackInfo(entry.path, -1, fileRead, entry.size, totalRead, this->size));
-                    return false;
-                }
-                fileRead += static_cast<quint64>(bs);
-                totalRead += static_cast<quint64>(bs);
-                if (progressCallback) {
-                    bool keepGoing =
-                            progressCallback(CallbackInfo(entry.path, bs, fileRead, entry.size, totalRead, this->size));
-                    if (!keepGoing) {
-                        return true;
-                    }
+            fileRead += static_cast<quint64>(bs);
+            totalRead += static_cast<quint64>(bs);
+            if (progressCallback) {
+                bool keepGoing =
+                        progressCallback(CallbackInfo(entry.path, bs, fileRead, entry.size, totalRead, this->size));
+                if (!keepGoing) {
+                    q->channel->abort();
+                    return true;
                 }
             }
-            channel->recvPacket();  // wait for remote closing the channel.
         }
     }
-
+    // Ensure all data drained / peer finished writeTo (same as RpcFile).
+    q->channel->recvPacket();
     return true;
 }
 
@@ -265,7 +283,6 @@ RpcDir::RpcDir(const QString &path)
     d->dirPath = path;
     d->name = dirInfo.fileName();
     if (dirInfo.exists()) {
-        d->size = static_cast<quint64>(dirInfo.size());
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
         d->created = dirInfo.metadataChangeTime();
 #else
@@ -304,10 +321,10 @@ static void _populate(const QDir &dir, const QString &relativePath, PopulateResu
     for (const QFileInfo &fileInfo : dir.entryInfoList(filters, QDir::DirsFirst)) {
         RpcDirFileEntry entry;
         const QString &name = fileInfo.fileName();
-        if (Q_UNLIKELY(name.contains("/"))) {
+        if (Q_UNLIKELY(name.contains(QLatin1Char('/')))) {
             continue;
         }
-        entry.path = relativePath.isEmpty() ? name : relativePath + "/" + name;
+        entry.path = relativePath.isEmpty() ? name : relativePath + QLatin1Char('/') + name;
         entry.size = static_cast<quint64>(fileInfo.size());
         entry.isdir = fileInfo.isDir();
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
@@ -318,19 +335,19 @@ static void _populate(const QDir &dir, const QString &relativePath, PopulateResu
         entry.lastModified = fileInfo.lastModified();
         entry.lastAccess = fileInfo.lastRead();
         result.entries.append(entry);
-        result.totalSize += entry.size;
+        if (!entry.isdir) {
+            result.totalSize += entry.size;
+        }
         if (fileInfo.isDir()) {
-            _populate(QDir(fileInfo.path()), entry.path, result);
+            _populate(QDir(fileInfo.filePath()), entry.path, result);
         }
     }
 }
 
 static PopulateResult populate(const QString &dirPath)
 {
-    QList<RpcDirFileEntry> entries;
-    QDir rootDir(dirPath);
     PopulateResult result;
-    _populate(rootDir, QString(), result);
+    _populate(QDir(dirPath), QString(), result);
     return result;
 }
 
@@ -340,7 +357,7 @@ bool RpcDir::populate()
     if (d->dirPath.isEmpty() || !QDir(d->dirPath).isReadable()) {
         return false;
     }
-    QString dirPath;
+    const QString dirPath = d->dirPath;
     PopulateResult result =
             qtng::callInThread<PopulateResult>([dirPath] { return LAFRPC_NAMESPACE::populate(dirPath); });
     d->entries = result.entries;

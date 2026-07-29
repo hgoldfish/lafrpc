@@ -378,6 +378,9 @@ QVariant PeerPrivate::call(const QString &methodName, const QVariantList &args, 
         streamFromServer->place = UseStream::ClientSide | UseStream::ValueOfResponse;
         streamFromServer->channel = subChannelFromServer;
         streamFromServer->rawSocket = rawSocket;
+    } else if (response->channel != 0) {
+        // Channel number without UseStream result: claim and drop to avoid pending leak.
+        channel->takeChannel(response->channel);
     }
     return response->result;
 }
@@ -422,6 +425,7 @@ void PeerPrivate::handlePacket()
             if (waiter.isNull()) {
                 // qCDebug(logger) << "received a response from server, but waiter is gone: " << response->id;
                 if (response->channel != 0) {
+                    // Claim and drop (VirtualChannel dtor aborts) so pendingChannels cannot leak.
                     channel->takeChannel(response->channel);
                 }
             } else {
@@ -504,6 +508,9 @@ void PeerPrivate::handleRequest(QSharedPointer<Request> request)
                 streamFromClient->rawSocket = rawSocket;
             }
         }
+    } else if (request->channel != 0) {
+        // Channel number without UseStream arg: claim and drop to avoid pending leak.
+        channel->takeChannel(request->channel);
     }
 
     if (response.exception.isNull()) {
