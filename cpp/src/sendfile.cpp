@@ -56,7 +56,6 @@ bool RpcFilePrivate::sendfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
             progressCallback(0, 0, 0);
         return true;
     }
-    q->channel->setCapacity(32);
 
     quint64 count = 0;
     QByteArray buf(BLOCK_SIZE, Qt::Uninitialized);
@@ -119,7 +118,6 @@ bool RpcFilePrivate::recvfileViaChannel(QSharedPointer<FileLike> f, RpcFile::Pro
             progressCallback(0, 0, 0);
         return true;
     }
-    q->channel->setCapacity(32);
     quint64 count = static_cast<quint64>(header.size());
     QSharedPointer<QCryptographicHash> hasher;
     const bool doHash = !hash.isEmpty();
