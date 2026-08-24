@@ -379,7 +379,7 @@ QSharedPointer<Peer> RpcPrivate::preparePeer(const QSharedPointer<qtng::DataChan
     qCDebug(logger) << "Rpc::preparePeer() -> receiving its header.";
 #endif
     QByteArray packet = channel->recvPacket();
-    if (packet.isNull()) {
+    if (packet.isEmpty()) {
 #ifdef DEUBG_RPC_PROTOCOL
         qCInfo(logger) << "Rpc::preparePeer() -> can not receive header.";
 #endif

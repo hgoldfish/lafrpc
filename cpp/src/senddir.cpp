@@ -73,6 +73,9 @@ bool NativeRpcDirFileProvider::updateTimes(const QString &filePath, const QDateT
     if (fullFilePath.isEmpty()) {
         return false;
     }
+    if (!QFileInfo::exists(fullFilePath)) {
+        return false;
+    }
     if (created.isValid()) {
         // TODO update created time.
     }
@@ -316,8 +319,10 @@ struct PopulateResult
 
 static void _populate(const QDir &dir, const QString &relativePath, PopulateResult &result)
 {
+    // 注意：不要使用 QDir::Executable 过滤——在 Unix 上普通文件（如 0644 权限）
+    // 没有执行位，会被过滤掉，导致目录里收集不到任何文件，发送目录失败。
     QDir::Filters filters =
-            QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable | QDir::Executable | QDir::Hidden;
+            QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable | QDir::Hidden;
     for (const QFileInfo &fileInfo : dir.entryInfoList(filters, QDir::DirsFirst)) {
         RpcDirFileEntry entry;
         const QString &name = fileInfo.fileName();
