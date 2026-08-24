@@ -453,8 +453,9 @@ void LafrpcHttpRequestHandler::doPOST()
     }
 
     QSharedPointer<SocketLike> stream;
+    HttpsTransport *transport = dynamic_cast<HttpsTransport *>(userData<LafrpcHttpData>()->transport);
     const SslConfiguration &sslConfig = userData<LafrpcHttpData>()->sslConfig;
-    if (!sslConfig.isNull()) {
+    if (transport && !sslConfig.isNull()) {
         QSharedPointer<SslSocket> ssl(new SslSocket(request, sslConfig));
         if (!ssl->handshake(true)) {
             return;
