@@ -5,7 +5,11 @@
 #include "qtnetworkng.h"
 #include <QtCore/qloggingcategory.h>
 #include <QtCore/qmetaobject.h>
-#include <QtCore/qscopeguard.h>
+#if QT_VERSION < QT_VERSION_CHECK(5, 12, 0)
+#  include "../include/qscopeguard.h"
+#else
+#  include <QtCore/qscopeguard.h>
+#endif
 
 static Q_LOGGING_CATEGORY(logger, "lafrpc.peer") using namespace qtng;
 
