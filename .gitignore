@@ -3,3 +3,4 @@ __pycache__
 .hgignore
 CMakeLists.txt.user*
 java/
+cpp/build/
