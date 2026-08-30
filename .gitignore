@@ -1,6 +1,7 @@
 __pycache__
 .hg/
 .hgignore
+.vscode/
 CMakeLists.txt.user*
 java/
 cpp/build/

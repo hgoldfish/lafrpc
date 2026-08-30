@@ -13,6 +13,27 @@
 
 static Q_LOGGING_CATEGORY(logger, "lafrpc.peer") using namespace qtng;
 
+namespace {
+
+// Create an instance of typeId and wrap it in a QVariant holding an independent
+// copy, then release the temporary. QVariant(type, void *) copies the value and
+// does not take ownership, so the QMetaType::create() object must be destroyed.
+QVariant makeVariantCopy(int typeId)
+{
+    QMetaType metaType(typeId);
+    void *obj = metaType.create();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    // Qt6 dropped QVariant(int, const void *); Qt5 lacks QVariant(QMetaType, const void *).
+    QVariant v(metaType, obj);
+#else
+    QVariant v(typeId, obj);
+#endif
+    metaType.destroy(obj);
+    return v;
+}
+
+}  // namespace
+
 // #define DEUBG_RPC_PROTOCOL
 
 BEGIN_LAFRPC_NAMESPACE
@@ -57,7 +78,7 @@ int unpackRequestOrResponse(const QSharedPointer<Serialization> &serialization, 
         return GOT_NOTHING;
     }
 
-    if (v.type() != QVariant::List) {
+    if (QMetaType::Type(v.userType()) != QMetaType::QVariantList) {
         return GOT_NOTHING;
     }
     const QVariantList &l = v.toList();
@@ -625,14 +646,22 @@ int metaTypeOf(const char *typeNameBytes)
 {
     QByteArray typeName(typeNameBytes);
     typeName.replace(' ', "");
+#if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
+    int type = QMetaType::fromName(typeName).id();
+#else
     int type = QMetaType::type(typeName);
+#endif
     if (type) {
         return type;
     }
     removeNamespace(typeName);
 
     for (int i = QMetaType::User;; ++i) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        const char *s = QMetaType(i).name();
+#else
         const char *s = QMetaType::typeName(i);
+#endif
         if (!s) {
             return 0;
         }
@@ -672,14 +701,17 @@ QString objectMethodArgMatchedError(const QMetaMethod &found, QVariantList &args
         const QByteArray &parameterName = parameterNames.at(i);
         QVariant &arg = args[i];
         if (arg.isValid()) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            if (!arg.convert(QMetaType(typeId))) {
+#else
             if (!arg.convert(typeId)) {
+#endif
                 QString message = "the parameter %1 with type %2 can not accept the past argument.";
                 return message.arg(QString::fromUtf8(parameterName), QString::fromUtf8(typeName));
             }
         } else {
             // xxx for null shared_pointer
-            void *obj = QMetaType::create(typeId);
-            arg = QVariant(typeId, obj);
+            arg = makeVariantCopy(typeId);
         }
         parameters.append(QGenericArgument(typeName.constData(), arg.constData()));
     }
@@ -718,7 +750,7 @@ QVariant objectCall(QObject *obj, const QString &methodName, const QVariantList 
             if (!rtype) {
                 throw RpcRemoteException(QString::fromUtf8("unknown return type: %1").arg(found.typeName()));
             }
-            QVariant rvalue(rtype, QMetaType::create(rtype));
+            QVariant rvalue = makeVariantCopy(rtype);
             QGenericReturnArgument rarg(found.typeName(), rvalue.data());
 
             found.invoke(obj, Qt::DirectConnection, rarg, parameters[0], parameters[1], parameters[2], parameters[3],

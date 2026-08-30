@@ -7,6 +7,25 @@
 #include <QtCore/qjsonobject.h>
 #include <QtCore/qjsonvalue.h>
 
+namespace {
+
+QMetaType::Type variantType(const QVariant &v)
+{
+    // QVariant::typeId() is Qt6-only; QVariant::type() is deprecated since Qt6.
+    // userType() is stable across Qt5/Qt6 and yields the same built-in ids as QMetaType::Type.
+    return QMetaType::Type(v.userType());
+}
+
+bool isNativeSerializableType(QMetaType::Type type)
+{
+    return type == QMetaType::Int || type == QMetaType::Double || type == QMetaType::QString
+        || type == QMetaType::Bool || type == QMetaType::QByteArray || type == QMetaType::LongLong
+        || type == QMetaType::UInt || type == QMetaType::ULongLong || type == QMetaType::QDateTime
+        || type == QMetaType::UnknownType || type == QMetaType::QStringList;
+}
+
+}  // namespace
+
 BEGIN_LAFRPC_NAMESPACE
 
 const QString Serialization::SpecialSidKey = "__laf_sid__";
@@ -20,28 +39,25 @@ Serialization::~Serialization() { }
 
 QVariant Serialization::saveState(const QVariant &obj)
 {
-    QVariant::Type type = obj.type();
-    if (type == QVariant::Int || type == QVariant::Double || type == QVariant::String || type == QVariant::Bool
-        || type == QVariant::ByteArray || type == QVariant::LongLong || type == QVariant::UInt
-        || type == QVariant::ULongLong || type == QVariant::DateTime || type == QVariant::Invalid
-        || type == QVariant::StringList) {
+    const QMetaType::Type type = variantType(obj);
+    if (isNativeSerializableType(type)) {
         return obj;
-    } else if (type == QVariant::List) {
+    } else if (type == QMetaType::QVariantList) {
         const QVariantList &l = obj.toList();
         QVariantList result;
         for (const QVariant &e : l) {
             result.append(saveState(e));
         }
         return result;
-    } else if (type == QVariant::Map) {
+    } else if (type == QMetaType::QVariantMap) {
         const QVariantMap &d = obj.toMap();
         QVariantMap result;
         for (QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
             result.insert(itor.key(), saveState(itor.value()));
         }
         return result;
-    } else if (type == static_cast<QVariant::Type>(QMetaType::QVariant)) {
-        return saveState(&obj);
+    } else if (type == QMetaType::QVariant) {
+        return saveState(obj.value<QVariant>());
     } else {
         for (QMap<QString, detail::SerializableInfo>::const_iterator itor = classes.constBegin();
              itor != classes.constEnd(); ++itor) {
@@ -60,27 +76,24 @@ QVariant Serialization::saveState(const QVariant &obj)
                 return result;
             }
         }
-        qDebug() << "unknown type: " << obj.type();
+        qDebug() << "unknown type: " << obj.typeName();
         throw RpcSerializationException();
     }
 }
 
 QVariant Serialization::restoreState(const QVariant &data)
 {
-    QVariant::Type type = data.type();
-    if (type == QVariant::Int || type == QVariant::Double || type == QVariant::String || type == QVariant::Bool
-        || type == QVariant::ByteArray || type == QVariant::LongLong || type == QVariant::UInt
-        || type == QVariant::ULongLong || type == QVariant::DateTime || type == QVariant::Invalid
-        || type == QVariant::StringList) {
+    const QMetaType::Type type = variantType(data);
+    if (isNativeSerializableType(type)) {
         return data;
-    } else if (type == QVariant::List) {
+    } else if (type == QMetaType::QVariantList) {
         const QVariantList &l = data.toList();
         QVariantList result;
         for (const QVariant &e : l) {
             result.append(restoreState(e));
         }
         return result;
-    } else if (type == QVariant::Map) {
+    } else if (type == QMetaType::QVariantMap) {
         const QVariantMap &d = data.toMap();
         QVariantMap result;
         for (QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
@@ -105,28 +118,27 @@ QVariant Serialization::restoreState(const QVariant &data)
             return result;
         }
     } else {
-        qDebug() << "unknown type:" << data.type();
+        qDebug() << "unknown type:" << data.typeName();
         throw RpcSerializationException();
     }
 }
 
 QVariant convertDateTime(const QVariant &obj)
 {
-    QVariant::Type type = obj.type();
-    if (type == QVariant::Int || type == QVariant::Double || type == QVariant::String || type == QVariant::Bool
-        || type == QVariant::ByteArray || type == QVariant::LongLong || type == QVariant::UInt
-        || type == QVariant::ULongLong || type == QVariant::Invalid || type == QVariant::StringList) {
-        return obj;
-    } else if (type == QVariant::DateTime) {
+    const QMetaType::Type type = variantType(obj);
+    if (type == QMetaType::QDateTime) {
+        // Must be checked before isNativeSerializableType(), which also matches QDateTime.
         return obj.toDateTime().toString(Qt::ISODate);
-    } else if (type == QVariant::List) {
+    } else if (isNativeSerializableType(type)) {
+        return obj;
+    } else if (type == QMetaType::QVariantList) {
         const QVariantList &l = obj.toList();
         QVariantList result;
         for (const QVariant &e : l) {
             result.append(convertDateTime(e));
         }
         return result;
-    } else if (type == QVariant::Map) {
+    } else if (type == QMetaType::QVariantMap) {
         const QVariantMap &d = obj.toMap();
         QVariantMap result;
         for (QVariantMap::const_iterator itor = d.constBegin(); itor != d.constEnd(); ++itor) {
@@ -134,7 +146,7 @@ QVariant convertDateTime(const QVariant &obj)
         }
         return result;
     } else {
-        qDebug() << "json can not handle this type:" << obj.type() << obj;
+        qDebug() << "json can not handle this type:" << obj.typeName() << obj;
         throw RpcSerializationException();
     }
 }
