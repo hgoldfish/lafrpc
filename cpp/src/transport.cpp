@@ -8,6 +8,11 @@
 
 static Q_LOGGING_CATEGORY(logger, "lafrpc.transport");
 
+// Raw sockets must be claimed by the peer within this window; entries that are
+// dead or older than this are purged lazily on the next raw-socket accept so the
+// map cannot grow without bound when the peer never takes them.
+static const qint64 RawSocketTimeoutMs = 5 * 60 * 1000;
+
 using namespace qtng;
 
 BEGIN_LAFRPC_NAMESPACE
@@ -109,8 +114,13 @@ QSharedPointer<SocketLike> Transport::makeRawSocket(const QString &address, QByt
 
 QSharedPointer<SocketLike> Transport::takeRawSocket(const QByteArray &connectionId)
 {
-    const RawSocket &rawConnection = rawConnections[connectionId];
-    return rawConnection.connection;
+    QMap<QByteArray, RawSocket>::iterator it = rawConnections.find(connectionId);
+    if (it == rawConnections.end()) {
+        return QSharedPointer<SocketLike>();
+    }
+    QSharedPointer<SocketLike> connection = it.value().connection;
+    rawConnections.erase(it);
+    return connection;
 }
 
 void Transport::setupChannel(QSharedPointer<SocketLike> request, QSharedPointer<SocketChannel> channel)
@@ -199,6 +209,21 @@ bool Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rp
             qCDebug(logger) << "handshaking is failed in server side.";
             return false;
         }
+        // Lazily purge raw sockets that were never claimed by the peer: dead
+        // connections or entries that sat around longer than RawSocketTimeoutMs.
+        // Rebuild the map instead of erase()-in-loop for Qt5 (< 5.15) compatibility.
+        const QDateTime &now = QDateTime::currentDateTime();
+        QMap<QByteArray, RawSocket> keep;
+        for (QMap<QByteArray, RawSocket>::const_iterator it = rawConnections.constBegin();
+             it != rawConnections.constEnd(); ++it) {
+            const RawSocket &raw = it.value();
+            if (raw.connection.isNull() || !raw.connection->isValid()
+                || raw.timeStamp.msecsTo(now) > RawSocketTimeoutMs) {
+                continue;
+            }
+            keep.insert(it.key(), raw);
+        }
+        rawConnections = keep;
         qCDebug(logger) << "got raw socket:" << connectionId;
         rawConnections.insert(connectionId, RawSocket(request, QDateTime::currentDateTime()));
     } else {
