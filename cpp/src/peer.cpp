@@ -457,6 +457,15 @@ void PeerPrivate::handlePacket()
                 waiter->send(response);
             }
         } else {
+            if (what == GOT_REQUEST && request->channel != 0) {
+                // Claim and drop: a malformed request that still carries a channel
+                // number would otherwise leak on the local pending queue.
+                channel->takeChannel(request->channel);
+            } else if (what == GOT_RESPONSE && response->channel != 0) {
+                // Claim and drop: a malformed response that still carries a channel
+                // number would otherwise leak on the local pending queue.
+                channel->takeChannel(response->channel);
+            }
             qCDebug(logger) << "can not handle received packet." << q->address() << packet;
         }
     }
@@ -465,6 +474,23 @@ void PeerPrivate::handlePacket()
 void PeerPrivate::handleRequest(QSharedPointer<Request> request)
 {
     Q_Q(Peer);
+    // RAII claim-and-drop.  If the request carries a channel number that this
+    // handler never claims (broken peer, rejected auth, ...), takeChannel() on
+    // scope exit releases it from the pending queue.  takeChannel() is a no-op
+    // once the channel has been claimed, so the normal path needs no dismiss().
+    struct UnclaimedChannelCleaner
+    {
+        QSharedPointer<DataChannel> dataChannel;
+        quint32 channelNumber;
+        ~UnclaimedChannelCleaner()
+        {
+            if (channelNumber != 0) {
+                dataChannel->takeChannel(channelNumber);
+            }
+        }
+    } cleaner{ channel, request->channel };
+    (void)cleaner;
+
     if (broken || rpc.isNull()) {
         return;
     }
