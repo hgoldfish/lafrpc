@@ -55,8 +55,6 @@ public:
     void setPayloadSizeHint(quint32 payloadSizeHint);
     float keepaliveTimeout() const;
     void setKeepaliveTimeout(float keepaliveTimeout);
-    qtng::KcpMode kcpMode() const;
-    void setKcpMode(qtng::KcpMode mode);
     QString myPeerName() const;
     QSharedPointer<Serialization> serialization() const;
     QSharedPointer<HeaderCallback> headerCallback() const;
@@ -136,7 +134,6 @@ public:
     RpcBuilder &headerCallback(QSharedPointer<HeaderCallback> headerCallback);
     RpcBuilder &loggingCallback(QSharedPointer<LoggingCallback> loggingCallback);
     RpcBuilder &kcpFilter(QSharedPointer<KcpFilter> kcpFilter);
-    RpcBuilder &kcpMode(qtng::KcpMode kcpMode);
     RpcBuilder &maxPacketSize(quint32 maxPacketSize);
     RpcBuilder &payloadSizeHint(quint32 payloadSizeHint);
     RpcBuilder &keepaliveTimeout(float keepaliveTimeout);
