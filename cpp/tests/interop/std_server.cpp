@@ -72,14 +72,16 @@ int main(int argc, char **argv)
     svc->bindAll();
     rpcServer->registerInstance(svc, "std");
 
+    CoroutineGroup jobs;
+
     // call back into the Qt client's "demo" service once a peer appears
-    rpcServer->onNewPeer([](shared_ptr<rpc::Peer> peer) {
+    rpcServer->onNewPeer([&jobs](shared_ptr<rpc::Peer> peer) {
         if (!peer) {
             return;
         }
         printf("[std] new peer: %s\n", peer->name().c_str());
         fflush(stdout);
-        Coroutine::spawn([peer] {
+        jobs.spawn([peer] {
             // give the qt client time to finish its own calls first; both
             // directions share one DataChannel but requests are independent.
             qtng::Coroutine::msleep(300);
@@ -119,7 +121,7 @@ int main(int argc, char **argv)
     fflush(stdout);
 
     // qt client dials in after a moment
-    Coroutine::spawn([] {
+    jobs.spawn([] {
         Coroutine::sleep(2.0f);
     });
 
