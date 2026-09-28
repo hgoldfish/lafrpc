@@ -39,6 +39,7 @@ RpcPrivate::RpcPrivate(const QSharedPointer<Serialization> &serialization, Rpc *
     transports.append(QSharedPointer<Transport>(new HttpTransport(parent)));
     transports.append(QSharedPointer<Transport>(new HttpsTransport(parent)));
     transports.append(QSharedPointer<Transport>(new HttpSslTransport(parent)));
+    transports.append(QSharedPointer<Transport>(new LocalTransport(parent)));
 
     registerClass<RpcRemoteException>();
     registerClass<RpcFile>();
