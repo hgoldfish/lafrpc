@@ -5,3 +5,4 @@ __pycache__
 CMakeLists.txt.user*
 java/
 cpp/build/
+/build/
