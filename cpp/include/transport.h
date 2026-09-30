@@ -29,7 +29,7 @@ public:
 public:
     virtual QString name() const = 0;
     virtual QSharedPointer<qtng::DataChannel> connect(const QString &address);
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address);
+    QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address);
     virtual bool startServer(const QString &address);
     virtual QSharedPointer<qtng::SocketLike> makeRawSocket(const QString &address, QByteArray &connectionId);
     virtual QSharedPointer<qtng::SocketLike> takeRawSocket(const QByteArray &connectionId);
@@ -188,29 +188,6 @@ protected:
     virtual QString getAddressTemplate() override;
 public:
     qtng::SslConfiguration sslConfig;
-};
-
-class LocalTransport : public Transport
-{
-public:
-    explicit LocalTransport(QPointer<Rpc> rpc)
-        : Transport(rpc)
-    {
-    }
-public:
-    virtual QString name() const override;
-    virtual bool canHandle(const QString &address) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address) override;
-protected:
-    virtual QSharedPointer<qtng::SocketLike> createConnection(const QString &address, const QString &host, quint16 port,
-                                                              QSharedPointer<qtng::SocketDnsCache> dnsCache) override;
-    virtual QSharedPointer<qtng::BaseStreamServer> createServer(const QString &address, const qtng::HostAddress &host,
-                                                                quint16 port) override;
-    virtual QString getAddressTemplate() override;
-    virtual bool parseAddress(const QString &address, QString &host, quint16 &port) override;
-private:
-    static QString extractServerName(const QString &address);
-    friend class LocalTransportRequestHandler;
 };
 
 END_LAFRPC_NAMESPACE

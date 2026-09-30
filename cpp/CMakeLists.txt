@@ -102,7 +102,4 @@ if(LAFRPC_BUILD_TESTS)
 
     add_executable(senddirtest tests/senddir_test.cpp)
     target_link_libraries(senddirtest PRIVATE Qt${LAFRPC_QT_VERSION_MAJOR}::Test Qt${LAFRPC_QT_VERSION_MAJOR}::Core lafrpc)
-
-    add_executable(test_local tests/test_local.cpp)
-    target_link_libraries(test_local PRIVATE Qt5::Core lafrpc)
 endif()
