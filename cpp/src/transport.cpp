@@ -192,14 +192,22 @@ bool Transport::handleRequest(QSharedPointer<SocketLike> request, QByteArray &rp
     if (rpcHeader == QByteArray("\x4e\x67")) {
         QSharedPointer<SocketChannel> channel(new SocketChannel(request, NegativePole));
         setupChannel(request, channel);
-        QString address = getAddressTemplate();
-        const HostAddress &peerAddress = request->peerAddress();
-        if (peerAddress.protocol() == HostAddress::IPv6Protocol) {
-            address = address.arg(QString::fromLatin1("[%1]").arg(peerAddress.toString()));
+        QString address;
+        if (request->type() == Socket::LocalSocket) {
+            address = request->localAddressURI();
+            if (address.isEmpty()) {
+                address = request->peerAddressURI();
+            }
         } else {
-            address = address.arg(peerAddress.toString());
+            address = getAddressTemplate();
+            const HostAddress &peerAddress = request->peerAddress();
+            if (peerAddress.protocol() == HostAddress::IPv6Protocol) {
+                address = address.arg(QString::fromLatin1("[%1]").arg(peerAddress.toString()));
+            } else {
+                address = address.arg(peerAddress.toString());
+            }
+            address = address.arg(request->peerPort());
         }
-        address = address.arg(request->peerPort());
         // qCDebug(logger) << "got request from:" << address;
         rpc->preparePeer(channel, QString(), address);
     } else if (rpcHeader == QByteArray("\x33\x74")) {
@@ -723,6 +731,108 @@ QString HttpSslTransport::name() const
 bool HttpSslTransport::canHandle(const QString &address)
 {
     return address.startsWith("http+ssl://", Qt::CaseInsensitive);
+}
+
+class LocalTransportRequestHandler : public BaseRequestHandler
+{
+protected:
+    virtual void handle() override
+    {
+        QByteArray rpcHeader;
+        userData<LocalTransport>()->handleRequest(request, rpcHeader);
+    }
+    virtual void finish() override { }
+};
+
+QString LocalTransport::extractServerName(const QString &address)
+{
+    QUrl u(address);
+    if (u.isValid()) {
+        // pipe://myname -> host=myname
+        // unix:///tmp/foo.sock -> path=/tmp/foo.sock
+        // unix://shortname -> host=shortname
+        if (!u.host().isEmpty()) {
+            const QString path = u.path();
+            if (!path.isEmpty() && path != QLatin1String("/")) {
+                return u.host() + path;
+            }
+            return u.host();
+        }
+        if (!u.path().isEmpty() && u.path() != QLatin1String("/")) {
+            return u.path();
+        }
+    }
+    const int idx = address.indexOf(QLatin1String("://"));
+    if (idx >= 0) {
+        return address.mid(idx + 3);
+    }
+    return QString();
+}
+
+bool LocalTransport::parseAddress(const QString &address, QString &host, quint16 &port)
+{
+    if (!canHandle(address)) {
+        return false;
+    }
+    const QString serverName = extractServerName(address);
+    if (serverName.isEmpty()) {
+        return false;
+    }
+    host = serverName;
+    port = 1;  // dummy: LocalSocket ignores port; base connect() requires port > 0
+    return true;
+}
+
+QSharedPointer<SocketLike> LocalTransport::createConnection(const QString &, const QString &host, quint16,
+                                                            QSharedPointer<SocketDnsCache>)
+{
+    QSharedPointer<LocalSocket> s(LocalSocket::createConnection(host));
+    if (!s.isNull()) {
+        return asSocketLike(s);
+    }
+    return QSharedPointer<SocketLike>();
+}
+
+QSharedPointer<BaseStreamServer> LocalTransport::createServer(const QString &address)
+{
+    QString host;
+    quint16 port = 0;
+    if (!parseAddress(address, host, port)) {
+        qCWarning(logger) << address << "is invalid local socket url.";
+        return QSharedPointer<BaseStreamServer>();
+    }
+    QSharedPointer<BaseStreamServer> server(new LocalServer<LocalTransportRequestHandler>(host));
+    server->setUserData(this);
+    return server;
+}
+
+QSharedPointer<BaseStreamServer> LocalTransport::createServer(const QString &, const HostAddress &, quint16)
+{
+    // IP:port form is unused for local transport; callers should use createServer(address).
+    return QSharedPointer<BaseStreamServer>();
+}
+
+QString LocalTransport::getAddressTemplate()
+{
+#ifdef Q_OS_WIN
+    return QStringLiteral("pipe://%1");
+#else
+    return QStringLiteral("unix://%1");
+#endif
+}
+
+QString LocalTransport::name() const
+{
+    return QString::fromUtf8("LocalTransport");
+}
+
+bool LocalTransport::canHandle(const QString &address)
+{
+#ifdef Q_OS_WIN
+    return address.startsWith(QLatin1String("pipe://"), Qt::CaseInsensitive);
+#else
+    return address.startsWith(QLatin1String("unix://"), Qt::CaseInsensitive);
+#endif
 }
 
 END_LAFRPC_NAMESPACE
